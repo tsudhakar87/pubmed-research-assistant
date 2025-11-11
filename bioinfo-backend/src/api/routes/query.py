@@ -6,7 +6,7 @@ from typing import Optional
 from ...models.request_models import BioinformaticsQuery
 from ...models.response_models import QueryResponse, PaperResult
 from ...config.settings import settings
-from ....external.ncbi_client import NCBIClient
+from ...external.ncbi_client import NCBIClient
 
 router = APIRouter(prefix="/query", tags=["Research"])
 
