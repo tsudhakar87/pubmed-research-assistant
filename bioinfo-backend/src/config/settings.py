@@ -1,0 +1,31 @@
+from pydantic_settings import BaseSettings
+from typing import Optional
+import os
+
+class Settings(BaseSettings):
+    # Environment
+    environment: str = "development"
+    debug: bool = True
+    
+    # API
+    api_host: str = "0.0.0.0"
+    api_port: int = 8080
+    
+    # Google Cloud
+    project_id: str = os.getenv("PROJECT_ID")
+    region: str = "us-central1"
+    
+    # Database
+    database_url: Optional[str] = None
+    bigquery_dataset: str = "bioinfo_analytics"
+
+    # NCBI E-utilities
+    ncbi_email: str = os.getenv("NCBI_EMAIL", "your-email@example.com")
+    ncbi_api_key: Optional[str] = os.getenv("NCBI_API_KEY")
+    ncbi_tool_name: str = "bioinformatics-research-assistant"
+
+    class Config:
+        env_file = ".env"
+
+# Global settings instance
+settings = Settings()

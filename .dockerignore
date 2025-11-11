@@ -1,0 +1,14 @@
+# Ignore during Docker build
+venv/
+.env
+__pycache__/
+*.pyc
+.git/
+.gitignore
+README.md
+docs/
+tests/
+frontend/node_modules/
+frontend/build/
+.DS_Store
+*.log

@@ -1,0 +1,19 @@
+# MCP specific dependencies
+mcp-server==0.4.0
+mcp-client==0.4.0
+mcp-tools==0.3.0
+
+# Database
+asyncpg==0.29.0
+sqlalchemy==2.0.23
+
+# Vector storage  
+chromadb==0.4.18
+
+# Google Cloud
+google-cloud-bigquery==3.13.0
+google-cloud-storage==2.10.0
+
+# Utilities
+aiohttp==3.9.1
+pydantic==2.5.2
