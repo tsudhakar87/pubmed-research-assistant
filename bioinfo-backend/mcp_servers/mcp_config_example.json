@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "ncbi-research": {
+      "command": "bash",
+      "args": [
+        "~/pubmed-research-assistant/bioinfo-backend/mcp_servers/start_ncbi_server.sh"
+      ],
+      "description": "NCBI PubMed research assistant for searching scientific literature",
+      "env": {
+        "NCBI_EMAIL": "your-email@example.com",
+        "NCBI_API_KEY": "your-api-key-here-optional"
+      }
+    },
+    "vector-embedding": {
+      "command": "bash",
+      "args": [
+        "~/pubmed-research-assistant/bioinfo-backend/mcp_servers/start_vector_server.sh"
+      ],
+      "description": "Vector embeddings and semantic search for research articles",
+      "env": {
+        "PROJECT_ID": "your-gcp-project-id"
+      }
+    },
+    "analytics": {
+      "command": "bash",
+      "args": [
+        "~/pubmed-research-assistant/bioinfo-backend/mcp_servers/start_analytics_server.sh"
+      ],
+      "description": "Data analysis and BigQuery analytics for research trends",
+      "env": {
+        "PROJECT_ID": "your-gcp-project-id"
+      }
+    }
+  }
+}
