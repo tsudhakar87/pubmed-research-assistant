@@ -6,4 +6,5 @@ venv/
 *.log
 .bioinfo-venv
 deployment
+.claude
 .claude-code
