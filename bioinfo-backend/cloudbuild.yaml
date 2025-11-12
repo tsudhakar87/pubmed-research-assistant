@@ -1,0 +1,72 @@
+# Google Cloud Build configuration for deploying to Cloud Run
+# This file automates building and deploying the FastAPI backend
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+      - '.'
+    id: 'build-image'
+
+  # Step 2: Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID'
+    id: 'push-image'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+    id: 'push-latest-tag'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=300'
+      - '--concurrency=80'
+      # Set environment variables
+      - '--set-env-vars=ENVIRONMENT=production'
+      - '--set-env-vars=PROJECT_ID=${PROJECT_ID}'
+      # Secrets from Secret Manager (uncomment and configure as needed)
+      # - '--set-secrets=NCBI_EMAIL=ncbi-email:latest'
+      # - '--set-secrets=NCBI_API_KEY=ncbi-api-key:latest'
+    id: 'deploy-cloud-run'
+
+# Substitution variables (can be overridden with --substitutions)
+substitutions:
+  _SERVICE_NAME: 'bioinfo-backend-api'
+  _REGION: 'us-central1'
+  _REPOSITORY: 'bioinfo-docker-repo'
+
+# Images to push to Artifact Registry
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+
+# Timeout for the entire build
+timeout: '1200s'
+
+options:
+  # Use higher CPU machine for faster builds
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,61 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud builds submit. It follows the same syntax as .gitignore.
+
+# Virtual environments (THIS IS THE BIG ONE - 600+ MB)
+.bioinfo-venv/
+**/.bioinfo-venv/
+venv/
+**/venv/
+.venv/
+**/.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.pytest_cache/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Data and databases
+data/
+*.db
+*.sqlite
+*.log
+
+# Testing
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Documentation (not needed for build)
+*.md
+!DEPLOYMENT.md
+docs/
+
+# MCP servers (not part of backend API)
+mcp_servers/
+
+# Development
+tests/

@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.bioinfo-venv/
+**/.bioinfo-venv/
+**/venv/
+**/.venv/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Documentation
+*.md
+docs/
+README.md
+LICENSE
+
+# MCP servers (not needed in backend deployment)
+mcp_servers/
+
+# Development files
+run.py
+tests/
+.editorconfig
+
+# Data and cache
+data/
+*.db
+*.sqlite
+*.log
+
+# Cloud Build and deployment files (don't need in image)
+cloudbuild.yaml
+Dockerfile
+.dockerignore
+deploy.sh
+DEPLOYMENT.md

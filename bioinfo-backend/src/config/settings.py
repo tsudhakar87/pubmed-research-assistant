@@ -1,15 +1,21 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 import os
 
 class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     debug: bool = True
-    
+
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8080
+
+    # CORS - Allow multiple origins
+    cors_origins: List[str] = [
+        "http://localhost:5173",  # Frontend dev server
+        "http://localhost:3000",  # Alternative frontend port
+    ]
     
     # Google Cloud
     project_id: str = os.getenv("PROJECT_ID")
