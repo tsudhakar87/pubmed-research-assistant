@@ -1,4 +1,5 @@
 # PubMed Research Assistant
+**_This project is a work-in-progress!_**
 
 A comprehensive bioinformatics research platform that automates literature searches, provides semantic analysis, and offers data analytics for scientific research. Built with FastAPI, React, and integrated with Google Cloud services and NCBI APIs.
 
