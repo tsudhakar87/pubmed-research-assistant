@@ -1,17 +1,18 @@
 from fastapi import APIRouter, HTTPException, Depends
 import uuid
-import time
 from typing import Optional
 
 from ...models.request_models import BioinformaticsQuery
-from ...models.response_models import QueryResponse, PaperResult
+from ...models.response_models import QueryResponse
 from ...config.settings import settings
 from ...external.ncbi_client import NCBIClient
+from ...agents.bioinfo_agent import BioinfoAgent
 
 router = APIRouter(prefix="/query", tags=["Research"])
 
 # NCBI client singleton
 _ncbi_client: Optional[NCBIClient] = None
+_bioinfo_agent: Optional[BioinfoAgent] = None
 
 
 async def get_ncbi_client() -> NCBIClient:
@@ -25,47 +26,41 @@ async def get_ncbi_client() -> NCBIClient:
         )
     return _ncbi_client
 
+
+async def get_bioinfo_agent() -> BioinfoAgent:
+    """Dependency to get BioinfoAgent instance"""
+    global _bioinfo_agent
+    if _bioinfo_agent is None:
+        ncbi_client = await get_ncbi_client()
+        _bioinfo_agent = BioinfoAgent(ncbi_client)
+    return _bioinfo_agent
+
+
 @router.post("/research", response_model=QueryResponse)
 async def research_query(
     query_request: BioinformaticsQuery,
-    ncbi_client: NCBIClient = Depends(get_ncbi_client)
+    agent: BioinfoAgent = Depends(get_bioinfo_agent)
 ) -> QueryResponse:
-    """Submit a research query and fetch results from PubMed"""
-    start_time = time.time()
+    """
+    Submit a research query and fetch results from PubMed
+
+    The agent will:
+    1. Analyze the query to detect temporal requirements (e.g., "latest" = last 2 years)
+    2. Search PubMed with optimized parameters (date filtering, sorting)
+    3. Generate AI-powered summary of results (if Vertex AI is configured)
+    """
     query_id = f"q_{uuid.uuid4().hex[:8]}"
 
     try:
-        # Search and fetch articles from NCBI PubMed
-        pubmed_articles = await ncbi_client.search_and_fetch(
-            query=query_request.query,
-            max_results=query_request.max_results
-        )
-
-        # Convert PubMedArticle to PaperResult
-        paper_results = [
-            PaperResult(
-                title=article.title,
-                authors=article.authors,
-                abstract=article.abstract,
-                journal=article.journal,
-                publication_date=article.publication_date,
-                pmid=article.pmid,
-                doi=article.doi,
-                keywords=article.keywords,
-                relevance_score=None 
-            )
-            for article in pubmed_articles
-        ]
-
-        processing_time = int((time.time() - start_time) * 1000)
-
-        return QueryResponse(
+        # Process query through the bioinfo agent
+        response = await agent.process_query(
+            query_request=query_request,
             query_id=query_id,
-            original_query=query_request.query,
-            literature_results=paper_results,
-            total_results=len(paper_results),
-            processing_time=processing_time
+            include_ai_summary=True  # Enable AI summaries (gracefully falls back if unavailable)
         )
+
+        return response
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

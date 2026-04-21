@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
+from .request_models import QueryType
 
 class PaperResult(BaseModel):
     """Individual research paper"""
@@ -13,15 +14,19 @@ class PaperResult(BaseModel):
     doi: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
     relevance_score: Optional[float] = None
-    
+
 class QueryResponse(BaseModel):
     """Main API response"""
     query_id: str
     original_query: str
+    refined_query: Optional[str] = None
+    query_type: Optional[QueryType] = None
     status: str = "completed"
     literature_results: List[PaperResult] = Field(default_factory=list)
     total_results: int = 0
     processing_time: int  # milliseconds
+    ai_summary: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     
     class Config:
         json_schema_extra = {
