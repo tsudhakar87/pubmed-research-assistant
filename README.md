@@ -1,354 +1,263 @@
 # PubMed Research Assistant
-**_This project is a work-in-progress!_**
 
-A comprehensive bioinformatics research platform that automates literature searches, provides semantic analysis, and offers data analytics for scientific research. Built with FastAPI, React, and integrated with Google Cloud services and NCBI APIs.
-
-## Overview
-
-This project enables researchers to:
-- Search and retrieve scientific articles from PubMed/NCBI databases
-- Perform semantic analysis on research literature using AI embeddings
-- Analyze publication trends and generate statistical insights
-- Deploy scalable research APIs to Google Cloud Run
-- Integrate with Claude Desktop via MCP (Model Context Protocol) servers
+A bioinformatics research platform for searching PubMed literature, detecting genetic variants, scoring them with NVIDIA BioNeMo, and synthesizing findings with Gemini AI. Built with FastAPI + React, deployed on Google Cloud Run.
 
 ## Architecture
 
 ```
 pubmed-research-assistant/
-├── bioinfo-backend/          # FastAPI backend server
+├── bioinfo-backend/
 │   ├── src/
-│   │   ├── api/             # REST API routes
-│   │   ├── external/        # External API clients (NCBI)
-│   │   ├── config/          # Configuration and settings
-│   │   ├── models/          # Data models
-│   │   └── services/        # Business logic services
-│   ├── mcp_servers/         # MCP servers for Claude Desktop
-│   │   ├── ncbi_server.py   # PubMed search tools
-│   │   ├── vector_server.py # Semantic search & embeddings
-│   │   └── analytics_server.py # Data analysis tools
-│   ├── Dockerfile           # Container configuration
-│   ├── cloudbuild.yaml      # Google Cloud Build config
-│   └── deploy.sh            # Deployment automation script
+│   │   ├── api/routes/       # REST endpoints + WebSocket
+│   │   ├── agents/           # Query classifier, synthesizer, bioinfo agent
+│   │   ├── external/         # NCBI client, rate limiter, data parser
+│   │   ├── services/         # Auth, Cloud SQL, BigQuery, Vertex AI
+│   │   ├── models/           # ORM models (SQLAlchemy 2.0) + request/response schemas
+│   │   ├── utils/            # Error handlers, logging, variant detection
+│   │   └── config/           # Settings, Vertex AI config
+│   ├── mcp_servers/          # MCP servers for Claude Desktop
+│   ├── alembic/              # DB migrations
+│   ├── tests/                # pytest suite (22 tests)
+│   ├── Dockerfile
+│   └── deploy.sh
 │
-├── bioinfo-frontend/        # React frontend application
-│   └── [React app structure]
+├── bioinfo-frontend/
+│   └── src/
+│       ├── pages/            # Login, Home, History, PaperDetail, Compare
+│       ├── components/       # Header, PaperCard, PipelineSteps, modals, skeletons
+│       ├── services/         # api.ts (REST), websocket.ts
+│       ├── hooks/            # useWebSocket, useQuery
+│       └── contexts/         # AuthContext (JWT)
 │
-├── .env                     # Environment configuration
-└── README.md               # This file
+├── .github/workflows/ci.yml  # GitHub Actions CI
+└── .env                      # Environment config (see below)
 ```
 
-## Components
+### Tech Stack
 
-### Backend API (bioinfo-backend)
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI, SQLAlchemy 2.0 + asyncpg, Alembic |
+| Auth | Google OAuth 2.0 ID tokens → internal JWT (HS256, 24h) |
+| AI | Vertex AI Gemini 2.5 Pro (synthesis), text-embedding-004 (similarity) |
+| Variant scoring | NVIDIA BioNeMo Evo2-40b via NIM API |
+| Database | PostgreSQL (local dev) → Cloud SQL (prod) |
+| Analytics | BigQuery (time-partitioned query events table) |
+| Frontend | React 19, TypeScript, Vite, react-router-dom |
+| Deployment | Google Cloud Run, Cloud Build, Artifact Registry |
+| CI | GitHub Actions (pytest + ruff + tsc + vite build) |
 
-FastAPI-based REST API providing:
-- **NCBI/PubMed Integration**: Search and fetch scientific articles
-- **Rate Limiting**: Compliant with NCBI API usage policies
-- **Data Parsing**: XML response parsing into structured data
-- **Health Checks**: API monitoring endpoints
+## API Endpoints
 
-**Tech Stack:**
-- FastAPI for REST APIs
-- aiohttp for async HTTP requests
-- Pydantic for data validation
-- Gunicorn + Uvicorn for production serving
+### Auth
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/google` | Exchange Google ID token for JWT |
+| `GET` | `/api/v1/auth/me` | Get current user info |
 
-### MCP Servers
+### Query
+| Method | Path | Description |
+|---|---|---|
+| `WS` | `/api/v1/ws/query` | Streaming research pipeline (auth via first message) |
+| `GET` | `/api/v1/query/history` | Past queries for current user |
+| `GET` | `/api/v1/query/history/{query_id}` | Reopen cached result |
+| `GET` | `/api/v1/query/similar?q=...` | Semantically similar past queries |
 
-MCP (Model Context Protocol) servers enable Claude Desktop to access research tools:
+### Papers
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/papers/{pmid}` | Paper detail + variant detection |
+| `POST` | `/api/v1/papers/compare` | AI-powered diff of 2-3 papers |
+| `GET` | `/api/v1/papers/{pmid}/score-variant?variant=V600E` | BioNeMo variant scoring |
 
-1. **NCBI Server** - PubMed article search and retrieval
-2. **Vector Server** - Semantic search using Google Vertex AI embeddings and ChromaDB
-3. **Analytics Server** - Publication trend analysis and BigQuery integration
+### Health
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/health` | Service health (DB, Vertex AI status) |
 
-These run locally and communicate with Claude Desktop via stdio.
-
-### Frontend (bioinfo-frontend)
-**In progress!**
-React-based web interface for:
-- Article search and browsing
-- Research workflow management
-- Results visualization
-
-## Prerequisites
-
-### Required
-- Python 3.11 or higher
-- Node.js 18+ and npm (for frontend)
-- Google Cloud account (for deployment and AI features)
-- NCBI E-utilities account (free registration)
-
-### Optional
-- Docker (for containerized deployment)
-- Claude Desktop (for MCP server integration)
-
-## Setup
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/yourusername/pubmed-research-assistant.git
-cd pubmed-research-assistant
+### WebSocket pipeline events
 ```
+classifying → searching_pubmed → retrieving_abstracts → synthesizing → done | error
+```
+Authenticate by sending `{"token": "<jwt>", "query": "..."}` as the first message.
 
-### 2. Configure Environment Variables
+## Local Development
 
-Create a `.env` file in the root directory:
+### Prerequisites
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL running locally
+- Google Cloud credentials (`gcloud auth application-default login`)
+
+### 1. Environment variables
+
+Copy and fill in `.env` at the repo root:
 
 ```bash
+# NCBI
+NCBI_EMAIL=you@example.com
+NCBI_API_KEY=your_ncbi_key          # optional but raises rate limit to 10 rps
+
 # Google Cloud
-PROJECT_ID=your-gcp-project-id
+GOOGLE_CLOUD_PROJECT=mcp-project-476900
+VERTEX_AI_LOCATION=us-central1
+VERTEX_AI_MODEL=gemini-2.5-pro
+VERTEX_AI_EMBEDDING_MODEL=text-embedding-004
 
-# NCBI E-utilities (required)
-NCBI_EMAIL=your-email@example.com
-NCBI_API_KEY=your-optional-api-key
+# Auth
+GOOGLE_CLIENT_ID=your_oauth_client_id.apps.googleusercontent.com
+JWT_SECRET=change_me_in_prod        # openssl rand -hex 32
 
-# Optional: Frontend origin for CORS
-CORS_ORIGINS=http://localhost:5173
+# Database (local)
+DATABASE_URL=postgresql+asyncpg://YOUR_MACOS_USER@localhost:5432/bioinfo_db
+
+# NVIDIA BioNeMo (add your own key)
+NVIDIA_API_KEY=
+
+# BigQuery (optional — analytics, fails silently if unset)
+BIGQUERY_DATASET=pubmed_analytics
+BIGQUERY_TABLE=query_events
 ```
 
-Get an NCBI API key: https://www.ncbi.nlm.nih.gov/account/settings/
+### 2. Database setup
 
-### 3. Backend Setup
+```bash
+# Create local database
+createdb bioinfo_db
+
+# Run migrations
+cd bioinfo-backend
+alembic upgrade head
+```
+
+### 3. Backend
 
 ```bash
 cd bioinfo-backend
-
-# Create virtual environment
-python -m venv .bioinfo-venv
-source .bioinfo-venv/bin/activate  # On Windows: .bioinfo-venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run development server
-python run.py
-```
-
-The API will be available at:
-- API: http://localhost:8080
-- Docs: http://localhost:8080/docs
-- Health: http://localhost:8080/api/v1/health
-
-### 4. Frontend Setup
-
-```bash
-cd bioinfo-frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-The frontend will be available at http://localhost:5173
-
-## Development
-
-### Running Backend Locally
-
-Two options:
-
-**Option 1: Development server with hot reload**
-```bash
-cd bioinfo-backend
-python run.py
-```
-
-**Option 2: Direct uvicorn**
-```bash
-cd bioinfo-backend
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-### Testing API Endpoints
+Interactive docs: http://localhost:8080/docs
+
+### 4. Frontend
 
 ```bash
-# Health check
-curl http://localhost:8080/api/v1/health
-
-# Search PubMed (example)
-curl -X POST http://localhost:8080/api/v1/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "CRISPR gene editing", "max_results": 5}'
+cd bioinfo-frontend
+# Set your Google OAuth client ID
+echo "VITE_GOOGLE_CLIENT_ID=your_client_id" >> .env
+npm install
+npm run dev
 ```
 
-### MCP Server Development
+App: http://localhost:5173
 
-MCP servers are designed for local use with Claude Desktop. To test:
+### 5. Tests
 
 ```bash
 cd bioinfo-backend
-
-# Test NCBI server
-export NCBI_EMAIL="your-email@example.com"
-./mcp_servers/start_ncbi_server.sh
+pytest                      # 22 tests
+pytest --tb=short -q        # quiet mode
 ```
 
-See `bioinfo-backend/mcp_servers/README.md` for detailed MCP setup instructions.
+## Deployment (Google Cloud Run)
 
-## Deployment
+### First-time GCP setup
 
-### Deploy to Google Cloud Run
+```bash
+# Enable APIs
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  sqladmin.googleapis.com \
+  bigquery.googleapis.com \
+  aiplatform.googleapis.com \
+  secretmanager.googleapis.com
 
-**Quick deployment:**
+# Store secrets
+echo -n "$JWT_SECRET"     | gcloud secrets create jwt-secret --data-file=-
+echo -n "$NVIDIA_API_KEY" | gcloud secrets create nvidia-api-key --data-file=-
+```
+
+### Deploy
 
 ```bash
 cd bioinfo-backend
-export PROJECT_ID=your-gcp-project-id
+export PROJECT_ID=mcp-project-476900
 ./deploy.sh
 ```
 
-This automated script will:
-1. Enable required Google Cloud APIs
-2. Create Artifact Registry repository
-3. Configure permissions
-4. Build Docker image
-5. Deploy to Cloud Run
+The script builds via Cloud Build, pushes to Artifact Registry, and deploys to Cloud Run in `us-central1`.
 
-**Manual deployment:**
+### Cloud SQL (prod database)
 
 ```bash
-# Enable required APIs
-gcloud services enable \
-    cloudbuild.googleapis.com \
-    run.googleapis.com \
-    artifactregistry.googleapis.com
+# Create instance
+gcloud sql instances create bioinfo-db \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=us-central1
 
-# Deploy using Cloud Build
-gcloud builds submit --config=cloudbuild.yaml
+# Create database
+gcloud sql databases create bioinfo_db --instance=bioinfo-db
+
+# Run migrations against Cloud SQL (via proxy)
+cloud_sql_proxy mcp-project-476900:us-central1:bioinfo-db &
+DATABASE_URL="postgresql+asyncpg://USER:PASS@127.0.0.1:5432/bioinfo_db" \
+  alembic upgrade head
 ```
 
-See `bioinfo-backend/DEPLOYMENT.md` for comprehensive deployment documentation.
+## MCP Servers (Claude Desktop)
 
-### Post-Deployment Configuration
+Three MCP servers expose tools to Claude Desktop:
 
-**Set CORS for frontend:**
-```bash
-gcloud run services update bioinfo-backend-api \
-    --region=us-central1 \
-    --set-env-vars=CORS_ORIGINS=https://your-frontend-domain.com
+| Server | Script | Tools |
+|---|---|---|
+| NCBI | `start_ncbi_server.sh` | search_pubmed, get_abstract |
+| BioNeMo | `start_bionemo_server.sh` | score_variant, detect_variants_in_text |
+| Vector | `start_vector_server.sh` | semantic_search |
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ncbi": {
+      "command": "/absolute/path/bioinfo-backend/mcp_servers/start_ncbi_server.sh"
+    },
+    "bionemo": {
+      "command": "/absolute/path/bioinfo-backend/mcp_servers/start_bionemo_server.sh"
+    }
+  }
+}
 ```
 
-**Add secrets (recommended):**
-```bash
-echo -n "your-email@example.com" | gcloud secrets create ncbi-email --data-file=-
-echo -n "your-api-key" | gcloud secrets create ncbi-api-key --data-file=-
-```
+## CI
 
-## Google Cloud APIs
+GitHub Actions runs on every push/PR to `main`:
 
-Enable these APIs in your GCP project:
-
-```bash
-gcloud services enable \
-    aiplatform.googleapis.com \
-    run.googleapis.com \
-    sqladmin.googleapis.com \
-    bigquery.googleapis.com \
-    storage.googleapis.com \
-    cloudbuild.googleapis.com \
-    artifactregistry.googleapis.com \
-    secretmanager.googleapis.com
-```
-
-## Project Structure Details
-
-### Backend Routes
-
-- `GET /` - API root information
-- `GET /docs` - Interactive API documentation (Swagger UI)
-- `GET /redoc` - Alternative API documentation
-- `GET /api/v1/health` - Health check endpoint
-- `POST /api/v1/search` - Search PubMed articles (example endpoint)
-
-### External API Clients
-
-**NCBI Client** (`src/external/ncbi_client.py`):
-- Async HTTP client for NCBI E-utilities
-- Rate limiting (3 req/sec without API key, 10 req/sec with key)
-- XML parsing to structured data models
-- Error handling and retries
-
-**Data Parser** (`src/external/data_parser.py`):
-- PubMed XML response parsing
-- Article metadata extraction (title, abstract, authors, etc.)
-- Date and keyword processing
-
-### Configuration
-
-Settings are managed via `src/config/settings.py` using Pydantic Settings:
-- Environment-based configuration
-- Type validation
-- Default values for development
-
-## Contributing
-
-### Code Style
-
-- Python: Follow PEP 8
-- Use type hints
-- Document functions with docstrings
-- Format with black (if available)
-
-### Testing
-
-```bash
-# Run backend tests
-cd bioinfo-backend
-pytest
-
-# Run frontend tests
-cd bioinfo-frontend
-npm test
-```
+- **backend-test** — pytest (22 tests, no DB needed)
+- **backend-lint** — ruff (E, F, W rules)
+- **frontend-build** — tsc --noEmit + vite build
 
 ## Common Issues
 
-### Backend won't start
-- Check that port 8080 is not in use: `lsof -i :8080`
-- Verify Python version: `python --version` (must be 3.11+)
-- Check environment variables are set correctly
+**`role "postgres" does not exist`** — Use your macOS username as the Postgres user in `DATABASE_URL`.
 
-### NCBI API errors
-- Verify NCBI_EMAIL is set and valid
-- Check rate limiting (max 3 requests/second without API key)
-- Ensure internet connection is stable
+**`ModuleNotFoundError: asyncpg`** — `pip install asyncpg --force-reinstall`
 
-### Docker build fails
-- Check that .dockerignore excludes virtual environments
-- Verify requirements.txt includes all dependencies
-- Try building locally: `docker build -t test-image .`
+**WebSocket auth fails** — Send JWT in the first message body, not as a header (browsers don't support custom WS headers).
 
-### MCP servers not working with Claude Desktop
-- Ensure startup scripts have execute permissions: `chmod +x mcp_servers/start_*.sh`
-- Check that scripts redirect output to stderr (`>&2`)
-- Verify Claude Desktop config path is absolute, not relative
+**BioNeMo returns 401** — Set `NVIDIA_API_KEY` in `.env`.
+
+**Variant gene not detected** — Gene must appear within ~60 characters before the variant notation (e.g., `BRAF V600E`).
 
 ## Resources
 
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [NCBI E-utilities API](https://www.ncbi.nlm.nih.gov/books/NBK25501/)
-- [Google Cloud Run Documentation](https://cloud.google.com/run/docs)
-- [MCP Protocol Specification](https://modelcontextprotocol.io)
-- [ChromaDB Documentation](https://docs.trychroma.com/)
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review `bioinfo-backend/DEPLOYMENT.md` for deployment issues
-3. Review `bioinfo-backend/mcp_servers/README.md` for MCP issues
-4. Open an issue in the repository
-
-## Acknowledgments
-
-- NCBI for providing the E-utilities API
-- Anthropic for the MCP protocol and Claude integration
-- Google Cloud Platform for infrastructure services
+- [FastAPI docs](https://fastapi.tiangolo.com/)
+- [NCBI E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25501/)
+- [NVIDIA NIM (BioNeMo)](https://build.nvidia.com/)
+- [Vertex AI Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs)
+- [Cloud Run](https://cloud.google.com/run/docs)
+- [MCP Protocol](https://modelcontextprotocol.io)
