@@ -1,8 +1,11 @@
 """
 Parse NCBI responses into structured data objects
 """
+import logging
 import xml.etree.ElementTree as ET
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -115,7 +118,7 @@ def parse_pubmed_xml(xml_text: str) -> List[PubMedArticle]:
 
         except Exception as e:
             # Log error but continue processing other articles
-            print(f"Error parsing article: {e}")
+            logger.warning("Error parsing article: %s", e)
             continue
 
     return articles

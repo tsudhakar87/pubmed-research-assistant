@@ -6,6 +6,8 @@ from typing import Optional, List, Dict, Any
 import os
 import json
 
+import logging
+
 try:
     import vertexai
     from vertexai.generative_models import GenerativeModel, GenerationConfig
@@ -14,6 +16,9 @@ except ImportError:
     VERTEX_AI_AVAILABLE = False
 
 from ..config.settings import settings
+from ..config.vertex_ai import vertex_ai_config
+
+logger = logging.getLogger(__name__)
 
 
 class VertexAIClient:
@@ -25,8 +30,8 @@ class VertexAIClient:
     def __init__(
         self,
         project_id: Optional[str] = None,
-        location: str = "us-central1",
-        model_name: str = "gemini-1.5-flash"
+        location: Optional[str] = None,
+        model_name: Optional[str] = None,
     ):
         """
         Initialize Vertex AI client
@@ -36,9 +41,9 @@ class VertexAIClient:
             location: GCP region for Vertex AI
             model_name: Name of the Gemini model to use
         """
-        self.project_id = project_id or settings.project_id
-        self.location = location
-        self.model_name = model_name
+        self.project_id = project_id or vertex_ai_config.project_id or settings.project_id
+        self.location = location or vertex_ai_config.location
+        self.model_name = model_name or vertex_ai_config.model_name
         self.available = VERTEX_AI_AVAILABLE and bool(self.project_id)
 
         if self.available:
@@ -46,7 +51,7 @@ class VertexAIClient:
                 vertexai.init(project=self.project_id, location=self.location)
                 self.model = GenerativeModel(self.model_name)
             except Exception as e:
-                print(f"Failed to initialize Vertex AI: {e}")
+                logger.warning("Failed to initialize Vertex AI: %s", e)
                 self.available = False
 
     async def generate_text(
@@ -85,7 +90,7 @@ class VertexAIClient:
             return response.text
 
         except Exception as e:
-            print(f"Vertex AI generation error: {e}")
+            logger.error("Vertex AI generation error: %s", e)
             return f"[AI summary error: {str(e)}]"
 
     async def summarize_papers(
@@ -139,7 +144,7 @@ Provide a clear, informative summary:"""
 
         return await self.generate_text(
             prompt=prompt,
-            max_tokens=512,
+            max_tokens=2048,
             temperature=0.5
         )
 
@@ -188,7 +193,7 @@ Respond ONLY with valid JSON."""
             return json.loads(cleaned.strip())
 
         except Exception as e:
-            print(f"Query analysis error: {e}")
+            logger.error("Query analysis error: %s", e)
             return {"error": str(e)}
 
 
