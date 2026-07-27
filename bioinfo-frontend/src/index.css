@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500;1,600&family=Source+Sans+3:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-canvas: #f1efe6;
+  --bg-white: #ffffff;
+  --bg-teal: #e1efec;
+  --bg-amber: #faf0dc;
+  --bg-purple: #ece9f4;
+  --bg-muted: #f6f4ec;
+
+  /* Text */
+  --text-navy: #1c2430;
+  --text-teal: #1f7a6c;
+  --text-teal-dark: #155c51;
+  --text-amber: #8a5c1a;
+  --text-amber-dark: #c98a2e;
+  --text-purple: #4f4171;
+  --text-purple-dark: #6b5b95;
+  --text-secondary: #5c6470;
+  --text-muted: #9aa1ab;
+
+  /* Borders */
+  --border-default: #dbd6c8;
+  --border-teal: #c3ddd6;
+  --border-amber: #e8cf9e;
+  --border-purple: #d7d0e6;
+  --border-navy: #1c2430;
+
+  /* Fonts */
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'Spline Sans Mono', 'Courier New', monospace;
+  --font-sans: 'Source Sans 3', system-ui, sans-serif;
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-canvas);
+  color: var(--text-navy);
+  min-height: 100vh;
+  background-image: linear-gradient(var(--border-default) 1px, transparent 1px);
+  background-size: 100% 32px;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Skeleton shimmer ─────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #ece9de 25%, #f6f4ec 37%, #ece9de 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 3px;
+}
+
+/* ── Cursor blink ─────────────────────────────────────────────────────────── */
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 1.5px;
+  height: 18px;
+  background: var(--text-teal);
+  margin-left: 2px;
+  vertical-align: -3px;
+  animation: blink 1.1s step-end infinite;
+}
+
+/* ── Utility ──────────────────────────────────────────────────────────────── */
+.mono { font-family: var(--font-mono); }
+.serif { font-family: var(--font-serif); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
