@@ -15,6 +15,10 @@ export interface VariantMention {
   notation: string;
   type: string;
   gene?: string;
+  // Nucleotide context around the variant. Abstract-text detection never
+  // populates these — scoring is only available when supplied explicitly.
+  ref_sequence?: string;
+  alt_sequence?: string;
 }
 
 export interface QueryResponse {
@@ -75,9 +79,12 @@ export interface VariantScore {
   pmid: string;
   variant: string;
   gene?: string;
-  score: number;
+  delta_log_likelihood: number;
+  ref_log_likelihood: number;
+  alt_log_likelihood: number;
   classification: 'disruptive' | 'moderate' | 'neutral';
-  sequence_context?: string;
+  ref_sequence: string;
+  alt_sequence: string;
   model: string;
   source: string;
 }

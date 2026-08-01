@@ -132,17 +132,24 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
           {primaryVariant && paper.pmid && (
             <button
               onClick={() => openVariantScore(primaryVariant)}
+              disabled={!primaryVariant.ref_sequence || !primaryVariant.alt_sequence}
+              title={
+                primaryVariant.ref_sequence && primaryVariant.alt_sequence
+                  ? undefined
+                  : 'Scoring requires nucleotide sequence context, which isn’t available from abstract text alone'
+              }
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10.5,
                 fontWeight: 600,
                 letterSpacing: '0.03em',
-                color: '#4f4171',
+                color: primaryVariant.ref_sequence && primaryVariant.alt_sequence ? '#4f4171' : '#9aa1ab',
                 border: '1px solid #d7d0e6',
-                background: '#ece9f4',
+                background: primaryVariant.ref_sequence && primaryVariant.alt_sequence ? '#ece9f4' : '#f6f4ec',
                 padding: '4px 9px',
                 borderRadius: 3,
-                cursor: 'pointer',
+                cursor: primaryVariant.ref_sequence && primaryVariant.alt_sequence ? 'pointer' : 'not-allowed',
+                opacity: primaryVariant.ref_sequence && primaryVariant.alt_sequence ? 1 : 0.6,
               }}
             >
               ⬡ score variant — {primaryVariant.gene ? `${primaryVariant.gene} ` : ''}{primaryVariant.notation}

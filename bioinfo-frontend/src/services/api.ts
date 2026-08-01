@@ -94,9 +94,15 @@ export async function comparePapers(pmids: string[]): Promise<CompareResult> {
 export async function scoreVariant(
   pmid: string,
   variant: string,
+  refSequence: string,
+  altSequence: string,
   gene?: string,
 ): Promise<VariantScore> {
-  const params = new URLSearchParams({ variant });
+  const params = new URLSearchParams({
+    variant,
+    ref_sequence: refSequence,
+    alt_sequence: altSequence,
+  });
   if (gene) params.append('gene', gene);
   return request(`/papers/${pmid}/score-variant?${params}`);
 }

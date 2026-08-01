@@ -16,9 +16,14 @@ export function VariantScoringModal({ pmid, variant, onClose }: Props) {
   const [errorMsg, setErrorMsg] = useState('');
 
   async function load() {
+    if (!variant.ref_sequence || !variant.alt_sequence) {
+      setErrorMsg('No nucleotide sequence context available for this variant — scoring requires the actual reference and mutant sequence, not just notation.');
+      setState('error');
+      return;
+    }
     setState('loading');
     try {
-      const r = await scoreVariant(pmid, variant.notation, variant.gene);
+      const r = await scoreVariant(pmid, variant.notation, variant.ref_sequence, variant.alt_sequence, variant.gene);
       setResult(r);
       setState('result');
     } catch (e) {
@@ -160,42 +165,43 @@ function LoadingBody({ variant }: { variant: VariantMention }) {
 }
 
 function ResultBody({ result }: { result: VariantScore }) {
-  const pct = Math.round(result.score * 100);
+  // Visual scale only — disruptive threshold (delta <= -1.0) maps to ~100%.
+  const pct = Math.max(0, Math.min(100, Math.round((-result.delta_log_likelihood / 2) * 100)));
   return (
     <div style={{ padding: '16px 18px 0' }}>
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: '#9aa1ab' }}>
         BioNeMo NIM · evo2-40b
       </span>
 
-      {result.sequence_context && (
+      <div style={{
+        marginTop: 10,
+        border: '1px dashed #dbd6c8',
+        borderRadius: 6,
+        padding: 14,
+        background: 'repeating-linear-gradient(135deg,#f6f4ec,#f6f4ec 10px,#efece1 10px,#efece1 20px)',
+      }}>
         <div style={{
-          marginTop: 10,
-          border: '1px dashed #dbd6c8',
-          borderRadius: 6,
-          padding: 14,
-          background: 'repeating-linear-gradient(135deg,#f6f4ec,#f6f4ec 10px,#efece1 10px,#efece1 20px)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 8.5,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase' as const,
+          color: '#9aa1ab',
+          marginBottom: 6,
         }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 8.5,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase' as const,
-            color: '#9aa1ab',
-            marginBottom: 6,
-          }}>
-            Sequence context
-          </div>
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            lineHeight: 1.7,
-            color: '#5c6470',
-            wordBreak: 'break-all',
-          }}>
-            {result.sequence_context}
-          </div>
+          Ref → Alt sequence
         </div>
-      )}
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          lineHeight: 1.7,
+          color: '#5c6470',
+          wordBreak: 'break-all',
+        }}>
+          {result.ref_sequence}
+          <br />
+          {result.alt_sequence}
+        </div>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
         <div>
@@ -207,10 +213,10 @@ function ResultBody({ result }: { result: VariantScore }) {
             color: '#9aa1ab',
             marginBottom: 3,
           }}>
-            Predicted effect (Δ likelihood)
+            Predicted effect (Δ log-likelihood)
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 600, color: '#4f4171' }}>
-            {result.score.toFixed(2)} · {result.classification}
+            {result.delta_log_likelihood.toFixed(2)} · {result.classification}
           </div>
         </div>
         <div style={{
