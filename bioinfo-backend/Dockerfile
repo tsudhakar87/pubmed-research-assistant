@@ -44,10 +44,12 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:${PORT}/api/v1/health', timeout=2)" || exit 1
 
-# Use gunicorn with uvicorn workers for production
+# Use gunicorn with a single uvicorn worker — Cloud Run scales via instances,
+# not in-process workers, and multiple workers race on the startup DDL in
+# cloud_sql_client.create_tables() (both try to CREATE TYPE concurrently).
 CMD exec gunicorn src.api.main:app \
     --bind :$PORT \
-    --workers 2 \
+    --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
     --timeout 120 \
     --access-logfile - \
