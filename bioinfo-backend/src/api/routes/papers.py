@@ -6,11 +6,15 @@ Paper-centric routes:
   GET  /api/v1/query/similar              — semantically similar past queries
 """
 import asyncio
+import base64
+import io
 import logging
 import os
+import re
 from typing import Optional
 
 import httpx
+import numpy as np
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
@@ -18,15 +22,51 @@ from ...external.ncbi_client import NCBIClient
 from ...services.auth_service import TokenPayload, get_current_user
 from ...services.vertex_ai_client import get_vertex_ai_client
 from ...utils.variant_detection import detect_variants
-from ...utils.error_handlers import NotFoundError, ExternalServiceError
+from ...utils.error_handlers import NotFoundError, ExternalServiceError, ValidationError
 from ...config.settings import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Papers"])
 
 NVIDIA_API_KEY: str = os.environ.get("NVIDIA_API_KEY", "")
-NVIDIA_EVO2_URL: str = "https://health.api.nvidia.com/v1/biology/arc/evo2-40b/score"
+# Evo2 NIM only exposes /generate and /forward — there is no direct "/score" endpoint.
+# Variant effect is computed as a delta in teacher-forced log-likelihood between the
+# reference and alternate nucleotide sequence, using the forward pass logits.
+NVIDIA_EVO2_FORWARD_URL: str = "https://health.api.nvidia.com/v1/biology/arc/evo2-40b/forward"
 BIONEMO_TIMEOUT: float = 30.0  # seconds
+_MAX_SEQUENCE_LEN: int = 4096
+_VALID_NUCLEOTIDES = re.compile(r"^[ACGTUNacgtun]+$")
+
+
+async def _evo2_log_likelihood(client: httpx.AsyncClient, sequence: str) -> float:
+    """
+    Teacher-forced log-likelihood of `sequence` under Evo2, computed from the
+    forward-pass unembedding logits. Evo2 uses a byte-level (single-nucleotide)
+    tokenizer, so token ids are simply the ASCII code of each character.
+
+    Standard causal-LM convention applies: logits at position i predict the
+    token at position i + 1, so the first character contributes no likelihood
+    term (there's no preceding context to condition on).
+    """
+    resp = await client.post(
+        NVIDIA_EVO2_FORWARD_URL,
+        json={"sequence": sequence, "output_layers": ["unembed"]},
+        headers={
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Content-Type": "application/json",
+        },
+    )
+    resp.raise_for_status()
+    raw = base64.b64decode(resp.json()["data"])
+    npz = np.load(io.BytesIO(raw))
+    logits = npz["unembed.output"][0]  # (seq_len, vocab)
+
+    log_probs = logits - np.logaddexp.reduce(logits, axis=-1, keepdims=True)
+    token_ids = [ord(c) for c in sequence]
+    ll = sum(
+        log_probs[i, token_ids[i + 1]] for i in range(len(sequence) - 1)
+    )
+    return float(ll)
 
 _ncbi_client: Optional[NCBIClient] = None
 
@@ -89,7 +129,6 @@ async def compare_papers(
     agreeing and diverging claims.
     """
     if len(body.pmids) < 2 or len(body.pmids) > 3:
-        from ...utils.error_handlers import ValidationError
         raise ValidationError("Provide 2 or 3 PMIDs to compare")
 
     ncbi = _get_ncbi()
@@ -143,33 +182,38 @@ async def score_variant(
     pmid: str,
     variant: str = Query(..., description="Variant notation, e.g. V600E or c.1799T>A"),
     gene: Optional[str] = Query(None, description="Gene symbol, e.g. BRAF"),
+    ref_sequence: str = Query(
+        ..., description="Wildtype nucleotide sequence around the variant (ACGT)"
+    ),
+    alt_sequence: str = Query(
+        ..., description="Mutant nucleotide sequence around the variant (ACGT), same length as ref_sequence"
+    ),
     current_user: TokenPayload = Depends(get_current_user),
 ) -> dict:
     """
     Score a variant using NVIDIA BioNeMo Evo2-40b NIM.
-    Returns predicted effect (Δ likelihood) and classification.
+
+    Evo2 has no single-shot "/score" endpoint — this computes the delta in
+    teacher-forced log-likelihood between the wildtype and mutant nucleotide
+    sequences via the /forward endpoint's unembedding logits. The caller must
+    supply the actual nucleotide context (protein notation like "V600E" alone
+    isn't sufficient input for a nucleotide-level model).
     """
     if not NVIDIA_API_KEY:
         raise ExternalServiceError("BioNeMo", "NVIDIA_API_KEY not configured")
 
-    payload = {
-        "variant": variant,
-        "gene": gene,
-        "model": "evo2-40b",
-    }
+    for name, seq in (("ref_sequence", ref_sequence), ("alt_sequence", alt_sequence)):
+        if not seq or not _VALID_NUCLEOTIDES.match(seq):
+            raise ValidationError(f"{name} must be a non-empty nucleotide sequence (ACGTUN)")
+        if len(seq) > _MAX_SEQUENCE_LEN:
+            raise ValidationError(f"{name} exceeds max length of {_MAX_SEQUENCE_LEN}")
 
     try:
         async with httpx.AsyncClient(timeout=BIONEMO_TIMEOUT) as client:
-            resp = await client.post(
-                NVIDIA_EVO2_URL,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {NVIDIA_API_KEY}",
-                    "Content-Type": "application/json",
-                },
+            ref_ll, alt_ll = await asyncio.gather(
+                _evo2_log_likelihood(client, ref_sequence),
+                _evo2_log_likelihood(client, alt_sequence),
             )
-            resp.raise_for_status()
-            result = resp.json()
     except httpx.TimeoutException:
         raise ExternalServiceError("BioNeMo Evo2", "Request timed out (>30s)")
     except httpx.HTTPStatusError as e:
@@ -177,18 +221,23 @@ async def score_variant(
     except Exception as e:
         raise ExternalServiceError("BioNeMo Evo2", str(e))
 
-    score: float = result.get("score", result.get("delta_likelihood", 0.0))
-    classification = "disruptive" if score >= 0.7 else ("neutral" if score <= 0.3 else "moderate")
+    delta = alt_ll - ref_ll
+    # Heuristic, uncalibrated thresholds on the raw log-likelihood delta —
+    # not validated against ground-truth pathogenicity labels.
+    classification = "disruptive" if delta <= -1.0 else ("neutral" if delta >= -0.1 else "moderate")
 
     return {
         "pmid": pmid,
         "variant": variant,
         "gene": gene,
-        "score": round(score, 3),
+        "delta_log_likelihood": round(delta, 4),
+        "ref_log_likelihood": round(ref_ll, 4),
+        "alt_log_likelihood": round(alt_ll, 4),
         "classification": classification,
-        "sequence_context": result.get("sequence_context"),
+        "ref_sequence": ref_sequence,
+        "alt_sequence": alt_sequence,
         "model": "evo2-40b",
-        "source": "BioNeMo NIM",
+        "source": "BioNeMo NIM (forward-pass log-likelihood)",
     }
 
 

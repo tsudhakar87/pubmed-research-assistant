@@ -13,12 +13,15 @@ Usage (add to claude_desktop_config.json):
   }
 """
 import asyncio
+import base64
+import io
 import json
 import os
 import sys
 from typing import Any
 
 import httpx
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -28,9 +31,32 @@ from mcp.server.stdio import stdio_server
 from mcp import types
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
-EVO2_URL = "https://health.api.nvidia.com/v1/biology/arc/evo2-40b/score"
+# Evo2 NIM has no direct "/score" endpoint — only /generate and /forward.
+# Variant effect is the delta in teacher-forced log-likelihood between the
+# wildtype and mutant nucleotide sequence, computed from /forward logits.
+EVO2_FORWARD_URL = "https://health.api.nvidia.com/v1/biology/arc/evo2-40b/forward"
 
 server = Server("bionemo-server")
+
+
+async def _evo2_log_likelihood(client: httpx.AsyncClient, sequence: str) -> float:
+    """Teacher-forced log-likelihood of `sequence` under Evo2's byte-level tokenizer."""
+    resp = await client.post(
+        EVO2_FORWARD_URL,
+        json={"sequence": sequence, "output_layers": ["unembed"]},
+        headers={
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Content-Type": "application/json",
+        },
+    )
+    resp.raise_for_status()
+    raw = base64.b64decode(resp.json()["data"])
+    npz = np.load(io.BytesIO(raw))
+    logits = npz["unembed.output"][0]
+
+    log_probs = logits - np.logaddexp.reduce(logits, axis=-1, keepdims=True)
+    token_ids = [ord(c) for c in sequence]
+    return float(sum(log_probs[i, token_ids[i + 1]] for i in range(len(sequence) - 1)))
 
 
 @server.list_tools()
@@ -39,27 +65,33 @@ async def handle_list_tools() -> list[types.Tool]:
         types.Tool(
             name="score_variant",
             description=(
-                "Score a genetic variant using BioNeMo Evo2-40b (NVIDIA NIM). "
-                "Provide the variant in HGVS or protein notation (e.g. V600E, c.1799T>A). "
-                "Returns a Δ-likelihood score and a classification (disruptive / moderate / neutral)."
+                "Score a genetic variant's predicted effect using BioNeMo Evo2-40b (NVIDIA NIM). "
+                "Requires the actual wildtype and mutant nucleotide sequence around the variant — "
+                "protein notation like 'V600E' alone is not sufficient input for this nucleotide-level "
+                "model. Returns the delta in teacher-forced log-likelihood and a classification "
+                "(disruptive / moderate / neutral)."
             ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "variant": {
                         "type": "string",
-                        "description": "Variant notation, e.g. 'V600E' or 'c.1799T>A'",
+                        "description": "Variant notation for labeling, e.g. 'V600E' or 'c.1799T>A'",
                     },
                     "gene": {
                         "type": "string",
-                        "description": "Gene symbol, e.g. 'BRAF' (optional but improves accuracy)",
+                        "description": "Gene symbol, e.g. 'BRAF' (optional, for labeling only)",
                     },
-                    "sequence_context": {
+                    "ref_sequence": {
                         "type": "string",
-                        "description": "Optional surrounding nucleotide sequence if known",
+                        "description": "Wildtype nucleotide sequence around the variant (ACGT)",
+                    },
+                    "alt_sequence": {
+                        "type": "string",
+                        "description": "Mutant nucleotide sequence around the variant (ACGT), same length as ref_sequence",
                     },
                 },
-                "required": ["variant"],
+                "required": ["variant", "ref_sequence", "alt_sequence"],
             },
         ),
         types.Tool(
@@ -99,7 +131,8 @@ async def handle_call_tool(
 async def _score_variant(args: dict) -> list[types.TextContent]:
     variant = args.get("variant", "")
     gene = args.get("gene")
-    seq_context = args.get("sequence_context")
+    ref_sequence = args.get("ref_sequence", "")
+    alt_sequence = args.get("alt_sequence", "")
 
     if not NVIDIA_API_KEY:
         return [types.TextContent(
@@ -107,39 +140,38 @@ async def _score_variant(args: dict) -> list[types.TextContent]:
             text=json.dumps({"error": "NVIDIA_API_KEY not set — cannot call BioNeMo NIM"}),
         )]
 
-    payload: dict[str, Any] = {"variant": variant, "model": "evo2-40b"}
-    if gene:
-        payload["gene"] = gene
-    if seq_context:
-        payload["sequence_context"] = seq_context
+    if not ref_sequence or not alt_sequence:
+        return [types.TextContent(
+            type="text",
+            text=json.dumps({
+                "error": "ref_sequence and alt_sequence are required — variant notation "
+                         "alone cannot be scored by a nucleotide-level model",
+                "variant": variant,
+            }),
+        )]
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                EVO2_URL,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {NVIDIA_API_KEY}",
-                    "Content-Type": "application/json",
-                },
+            ref_ll, alt_ll = await asyncio.gather(
+                _evo2_log_likelihood(client, ref_sequence),
+                _evo2_log_likelihood(client, alt_sequence),
             )
-            resp.raise_for_status()
-            result = resp.json()
 
-        score: float = result.get("score", result.get("delta_likelihood", 0.0))
+        delta = alt_ll - ref_ll
         classification = (
-            "disruptive" if score >= 0.7
-            else ("neutral" if score <= 0.3 else "moderate")
+            "disruptive" if delta <= -1.0
+            else ("neutral" if delta >= -0.1 else "moderate")
         )
 
         output = {
             "variant": variant,
             "gene": gene,
-            "score": round(score, 3),
+            "delta_log_likelihood": round(delta, 4),
+            "ref_log_likelihood": round(ref_ll, 4),
+            "alt_log_likelihood": round(alt_ll, 4),
             "classification": classification,
-            "sequence_context": result.get("sequence_context"),
             "model": "evo2-40b",
-            "source": "BioNeMo NIM",
+            "source": "BioNeMo NIM (forward-pass log-likelihood)",
         }
     except httpx.TimeoutException:
         output = {"error": "BioNeMo Evo2 timed out (>30s)", "variant": variant}
