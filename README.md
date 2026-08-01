@@ -2,6 +2,8 @@
 
 A bioinformatics research platform for searching PubMed literature, detecting genetic variants, scoring them with NVIDIA BioNeMo, and synthesizing findings with Gemini AI. Built with FastAPI + React, deployed on Google Cloud Run.
 
+**Live demo:** [pubmed-assistant.web.app](https://pubmed-assistant.web.app)
+
 ## Architecture
 
 ```
