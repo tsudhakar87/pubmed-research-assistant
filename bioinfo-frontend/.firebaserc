@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "mcp-project-476900"
+  },
+  "targets": {
+    "mcp-project-476900": {
+      "hosting": {
+        "main": [
+          "pubmed-assistant"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

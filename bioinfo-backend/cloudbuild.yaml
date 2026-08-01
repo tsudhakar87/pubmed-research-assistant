@@ -44,12 +44,9 @@ steps:
       - '--max-instances=10'
       - '--timeout=300'
       - '--concurrency=80'
-      # Set environment variables
-      - '--set-env-vars=ENVIRONMENT=production'
-      - '--set-env-vars=PROJECT_ID=${PROJECT_ID}'
-      # Secrets from Secret Manager (uncomment and configure as needed)
-      # - '--set-secrets=NCBI_EMAIL=ncbi-email:latest'
-      # - '--set-secrets=NCBI_API_KEY=ncbi-api-key:latest'
+      - '--add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}'
+      - '--set-env-vars=^;^ENVIRONMENT=production;PROJECT_ID=${PROJECT_ID};GOOGLE_CLOUD_PROJECT=${PROJECT_ID};REGION=${_REGION};VERTEX_AI_LOCATION=${_REGION};VERTEX_AI_MODEL=gemini-2.5-flash;VERTEX_AI_EMBEDDING_MODEL=text-embedding-004;BIGQUERY_DATASET=bioinfo_analytics;GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID};CORS_ORIGINS=${_CORS_ORIGINS}'
+      - '--set-secrets=DATABASE_URL=database-url:latest,JWT_SECRET=jwt-secret:latest,NVIDIA_API_KEY=nvidia-api-key:latest,NCBI_EMAIL=ncbi-email:latest,NCBI_API_KEY=ncbi-api-key:latest'
     id: 'deploy-cloud-run'
 
 # Substitution variables (can be overridden with --substitutions)
@@ -57,6 +54,9 @@ substitutions:
   _SERVICE_NAME: 'bioinfo-backend-api'
   _REGION: 'us-central1'
   _REPOSITORY: 'bioinfo-docker-repo'
+  _SQL_INSTANCE: 'bioinfo-db'
+  _GOOGLE_CLIENT_ID: '1085233957159-202e530uj9p9qnt45imm6db82dlf4jta.apps.googleusercontent.com'
+  _CORS_ORIGINS: 'https://pubmed-assistant.web.app,https://pubmed-assistant.firebaseapp.com,http://localhost:5173'
 
 # Images to push to Artifact Registry
 images:
