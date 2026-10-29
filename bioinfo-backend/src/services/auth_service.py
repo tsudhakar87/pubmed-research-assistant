@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 JWT_SECRET: str = os.environ.get("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM: str = "HS256"
 JWT_EXPIRY_HOURS: int = 24
+# Google's iat/nbf can be a few seconds ahead of our clock, which otherwise
+# fails verification with "Token used too early".
+GOOGLE_CLOCK_SKEW_SECONDS: int = 10
 GOOGLE_CLIENT_ID: str = os.environ.get("GOOGLE_CLIENT_ID", "")
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -60,11 +63,15 @@ def verify_google_token(id_token: str) -> dict:
             id_token,
             google_requests.Request(),
             GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=GOOGLE_CLOCK_SKEW_SECONDS,
         )
-        return claims
     except ValueError as e:
         logger.warning("Google token verification failed", extra={"error": str(e)})
         raise AuthError(f"Invalid Google token: {e}")
+
+    if not claims.get("email") or not claims.get("email_verified", False):
+        raise AuthError("Google account email is missing or unverified")
+    return claims
 
 
 # ── Internal JWT ─────────────────────────────────────────────────────────────
@@ -124,6 +131,13 @@ async def get_current_user(
             detail=e.message,
             headers={"WWW-Authenticate": "Bearer"},
         )
+    except (KeyError, ValueError):
+        # Signature was valid but the claims are malformed (missing sub/email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token claims",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def get_optional_user(
@@ -135,5 +149,5 @@ async def get_optional_user(
     try:
         payload = decode_access_token(credentials.credentials)
         return TokenPayload(payload)
-    except AuthError:
+    except (AuthError, KeyError, ValueError):
         return None

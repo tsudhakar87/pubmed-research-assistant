@@ -40,7 +40,7 @@ register_error_handlers(app)
 cors_origins = settings.cors_origins.copy()
 additional_origins = os.getenv("CORS_ORIGINS", "")
 if additional_origins:
-    cors_origins.extend(additional_origins.split(","))
+    cors_origins.extend(o.strip() for o in additional_origins.split(",") if o.strip())
 
 app.add_middleware(
     CORSMiddleware,

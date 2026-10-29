@@ -68,10 +68,17 @@ async def _upsert_user(claims: dict) -> User:
         return u
 
     async with get_session() as session:
+        now = datetime.now(timezone.utc)
         result = await session.execute(
             select(User).where(User.google_sub == google_sub)
         )
         user = result.scalar_one_or_none()
+
+        if user is None:
+            # Fall back to email so a row created without (or with a different)
+            # google_sub doesn't trip the unique email constraint and 500.
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
 
         if user is None:
             user = User(
@@ -79,12 +86,16 @@ async def _upsert_user(claims: dict) -> User:
                 google_sub=google_sub,
                 name=name,
                 picture_url=picture,
+                last_login=now,
             )
             session.add(user)
         else:
+            user.google_sub = google_sub
+            user.email = email
             user.name = name
             user.picture_url = picture
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = now
+        await session.flush()
 
     return user
 

@@ -12,9 +12,9 @@ export type WSCallback = (event: WSEvent) => void;
 export class QueryWebSocket {
   private ws: WebSocket | null = null;
   private onMessage: WSCallback;
-  private onClose: () => void;
+  private onClose: (code: number) => void;
 
-  constructor(onMessage: WSCallback, onClose: () => void) {
+  constructor(onMessage: WSCallback, onClose: (code: number) => void) {
     this.onMessage = onMessage;
     this.onClose = onClose;
   }
@@ -35,9 +35,9 @@ export class QueryWebSocket {
       }
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (e: CloseEvent) => {
       this.ws = null;
-      this.onClose();
+      this.onClose(e.code);
     };
 
     this.ws.onerror = () => {
@@ -46,7 +46,13 @@ export class QueryWebSocket {
   }
 
   disconnect(): void {
-    this.ws?.close();
+    if (this.ws) {
+      // Detach handlers so a superseded socket can't touch the new query's state
+      this.ws.onmessage = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+    }
     this.ws = null;
   }
 

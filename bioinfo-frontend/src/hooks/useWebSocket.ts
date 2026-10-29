@@ -20,7 +20,10 @@ const STEP_ORDER: PipelineStep[] = [
   'done',
 ];
 
-export function useWebSocket(): UseWebSocketResult {
+// Close code the backend uses when the JWT in the first message is invalid/expired
+const WS_UNAUTHORIZED = 4001;
+
+export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
   const [step, setStep] = useState<PipelineStep>('idle');
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,15 +61,16 @@ export function useWebSocket(): UseWebSocketResult {
             setStep(evt);
           }
         },
-        () => {
+        (code) => {
           setIsRunning(false);
+          if (code === WS_UNAUTHORIZED) onUnauthorized?.();
         },
       );
 
       wsRef.current = ws;
       ws.connect(query, token, maxResults);
     },
-    [],
+    [onUnauthorized],
   );
 
   return { step, result, error, isRunning, submitQuery, cancel };

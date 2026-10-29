@@ -14,6 +14,14 @@ function getToken(): string | null {
   return localStorage.getItem('access_token');
 }
 
+// Called when an authenticated request comes back 401 (e.g. the JWT expired),
+// so the app can drop the stale session instead of failing every call.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -24,6 +32,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
+    if (res.status === 401 && token) onUnauthorized?.();
     const body = await res.json().catch(() => ({})) as Record<string, string>;
     throw new ApiError(res.status, body['message'] ?? res.statusText, body);
   }

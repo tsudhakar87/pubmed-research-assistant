@@ -18,6 +18,35 @@ declare global {
   }
 }
 
+const GIS_SRC = 'https://accounts.google.com/gsi/client';
+
+// The GIS script and initialize() must only happen once per page load. Re-adding
+// the script or re-initializing on every visit to /login (StrictMode double
+// mount, sign out then back) leads to the button not rendering or the callback
+// firing on an unmounted page.
+let gisScriptPromise: Promise<void> | null = null;
+let gisInitialized = false;
+let activeCredentialHandler: ((credential: string) => Promise<void>) | null = null;
+
+function loadGoogleIdentityScript(): Promise<void> {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (!gisScriptPromise) {
+    gisScriptPromise = new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = GIS_SRC;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        gisScriptPromise = null;
+        script.remove();
+        reject(new Error('Failed to load Google Identity Services'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return gisScriptPromise;
+}
+
 export function LoginPage() {
   const { signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
@@ -29,38 +58,56 @@ export function LoginPage() {
     if (user) navigate('/', { replace: true });
   }, [user]);
 
+  // Keep the latest sign-in handler in a ref so the GIS callback, which is
+  // registered once, never calls a stale closure.
+  const handleCredentialRef = useRef<(credential: string) => Promise<void>>(async () => {});
+  handleCredentialRef.current = async (credential: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInWithGoogle(credential);
+      navigate('/', { replace: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+    let cancelled = false;
 
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.onload = () => {
-      window.google?.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (response: { credential: string }) => {
-          setLoading(true);
-          try {
-            await signInWithGoogle(response.credential);
-            navigate('/', { replace: true });
-          } catch (e) {
-            setError(e instanceof Error ? e.message : 'Sign-in failed');
-          } finally {
-            setLoading(false);
-          }
-        },
+    loadGoogleIdentityScript()
+      .then(() => {
+        if (cancelled || !window.google) return;
+        if (!gisInitialized) {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: (response: { credential: string }) => {
+              void activeCredentialHandler?.(response.credential);
+            },
+          });
+          gisInitialized = true;
+        }
+        activeCredentialHandler = (c) => handleCredentialRef.current(c);
+        if (googleBtnRef.current) {
+          window.google.accounts.id.renderButton(googleBtnRef.current, {
+            theme: 'outline',
+            size: 'large',
+            width: 336,
+            text: 'signin_with',
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not load Google sign-in. Check your connection or ad blocker.');
       });
-      if (googleBtnRef.current) {
-        window.google?.accounts.id.renderButton(googleBtnRef.current, {
-          theme: 'outline',
-          size: 'large',
-          width: 336,
-          text: 'signin_with',
-        });
-      }
+
+    return () => {
+      cancelled = true;
+      activeCredentialHandler = null;
     };
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
   }, []);
 
   return (

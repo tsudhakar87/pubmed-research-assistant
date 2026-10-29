@@ -40,9 +40,9 @@ function sortPapers(papers: PaperResult[], order: SortOrder): PaperResult[] {
 }
 
 export function HomePage() {
-  const { token } = useAuth();
+  const { token, signOut } = useAuth();
   const navigate = useNavigate();
-  const { step, result, error, isRunning, submitQuery } = useWebSocket();
+  const { step, result, error, isRunning, submitQuery } = useWebSocket(signOut);
 
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [sortOrder, setSortOrder] = useState<SortOrder>('relevance');
