@@ -1,5 +1,6 @@
 """Integration tests for global error handlers via FastAPI TestClient."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
@@ -65,7 +66,6 @@ class TestErrorHandlers:
         assert res.json()["error"] == "internal_error"
 
     def test_validation_error_returns_422(self, client):
-        from fastapi import Query as FQuery
 
         # Hit a nonexistent route to get a 404 (not 422) first, then use a real route
         res = client.get("/docs")

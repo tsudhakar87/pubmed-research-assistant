@@ -1,10 +1,10 @@
 """Unit tests for NCBI rate limiter."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import asyncio
 import time
-import pytest
 
 from src.external.rate_limiter import RateLimiter
 

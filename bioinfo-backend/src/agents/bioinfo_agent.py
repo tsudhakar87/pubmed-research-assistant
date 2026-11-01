@@ -6,7 +6,7 @@ Supports an optional async progress_callback for WebSocket streaming.
 from typing import Any, Callable, Coroutine, List, Optional
 import time
 
-from ..models.request_models import BioinformaticsQuery, QueryType
+from ..models.request_models import BioinformaticsQuery
 from ..models.response_models import QueryResponse, PaperResult
 from ..external.ncbi_client import NCBIClient
 from .query_classifier import QueryClassifier, QueryAnalysis

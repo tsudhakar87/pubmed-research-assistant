@@ -28,7 +28,6 @@ except ImportError:
     _GOOGLE_AUTH_AVAILABLE = False
 
 from ..utils.error_handlers import AuthError
-from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 

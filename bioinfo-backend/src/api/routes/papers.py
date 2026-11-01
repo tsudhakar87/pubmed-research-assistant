@@ -262,8 +262,6 @@ async def similar_queries(
         return {"queries": [], "method": "unavailable"}
 
     # Try embedding-based similarity first
-    ai_client = get_vertex_ai_client()
-
     async with get_session() as session:
         # Fetch recent queries for this user that have embeddings
         result = await session.execute(

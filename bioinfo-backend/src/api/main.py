@@ -1,5 +1,6 @@
 # FastAPI application for backend
 # Load .env as early as possible so all os.environ.get() calls see the values
+import logging
 import os
 from pathlib import Path
 try:
@@ -22,7 +23,6 @@ from ..services.bigquery_client import ensure_table_exists
 # Configure logging first so all subsequent imports log correctly
 configure_logging(environment=settings.environment)
 
-import logging
 logger = logging.getLogger(__name__)
 
 app = FastAPI(

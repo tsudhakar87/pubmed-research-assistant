@@ -3,7 +3,6 @@ Vertex AI client for LLM-based text generation and analysis
 Uses Google's Gemini models via Vertex AI
 """
 from typing import Optional, List, Dict, Any
-import os
 import json
 
 import logging

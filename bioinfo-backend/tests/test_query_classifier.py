@@ -1,6 +1,7 @@
 """Unit tests for QueryClassifier — temporal detection and query type inference."""
 import pytest
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.agents.query_classifier import QueryClassifier

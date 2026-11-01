@@ -4,7 +4,7 @@ Query classifier agent that analyzes user queries to determine:
 - Temporal requirements (recent, last N years, date range)
 - Search strategy (sort order, filters)
 """
-from typing import Optional, Tuple
+from typing import Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import re

@@ -23,11 +23,11 @@ class Settings(BaseSettings):
         ],
         validation_alias="CORS_ORIGINS_DEFAULT",
     )
-    
+
     # Google Cloud
-    project_id: str = os.getenv("PROJECT_ID")
+    project_id: Optional[str] = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
     region: str = "us-central1"
-    
+
     # Database
     database_url: Optional[str] = None
     bigquery_dataset: str = "bioinfo_analytics"

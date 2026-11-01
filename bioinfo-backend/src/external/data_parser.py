@@ -3,11 +3,11 @@ Parse NCBI responses into structured data objects
 """
 import logging
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass

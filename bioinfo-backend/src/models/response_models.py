@@ -27,7 +27,7 @@ class QueryResponse(BaseModel):
     processing_time: int  # milliseconds
     ai_summary: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-    
+
     class Config:
         json_schema_extra = {
             "example": {

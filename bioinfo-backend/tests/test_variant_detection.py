@@ -1,5 +1,6 @@
 """Unit tests for variant detection utility."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.utils.variant_detection import detect_variants
