@@ -44,14 +44,22 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
     <>
       <div style={{ padding: '16px 0', borderBottom: '1px solid #dbd6c8' }}>
         {onSelectForCompare && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+          <label
+            title="Select to compare side-by-side with other papers"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8, cursor: 'pointer' }}
+          >
             <input
               type="checkbox"
               checked={selectedForCompare}
               onChange={(e) => onSelectForCompare(paper.pmid ?? '', e.target.checked)}
             />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#9aa1ab' }}>
-              Compare
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              color: selectedForCompare ? '#155c51' : '#9aa1ab',
+              fontWeight: selectedForCompare ? 600 : 400,
+            }}>
+              {selectedForCompare ? 'Selected for compare' : 'Compare'}
             </span>
           </label>
         )}

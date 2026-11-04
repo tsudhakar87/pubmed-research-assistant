@@ -80,6 +80,10 @@ export async function reopenQuery(queryId: string): Promise<QueryResponse> {
   return request(`/query/history/${queryId}`);
 }
 
+export async function regenerateSummary(queryId: string): Promise<{ ai_summary: string | null }> {
+  return request(`/query/${queryId}/synthesize`, { method: 'POST' });
+}
+
 export async function getSimilarQueries(
   q: string,
   limit = 5,

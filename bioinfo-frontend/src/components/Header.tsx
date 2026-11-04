@@ -24,16 +24,6 @@ export function Header() {
         onClick={() => navigate('/')}
       >
         <div style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: '#155c51',
-          fontWeight: 600,
-        }}>
-          Literature Synthesis & Comparison Tool
-        </div>
-        <div style={{
           fontFamily: 'var(--font-serif)',
           fontStyle: 'italic',
           fontWeight: 600,
@@ -78,7 +68,7 @@ export function Header() {
           }}>
             {initials}
           </div>
-          <span>signed in</span>
+          <span>Sign out</span>
         </button>
       )}
     </div>

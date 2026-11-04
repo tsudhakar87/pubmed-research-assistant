@@ -3,9 +3,11 @@ interface Props {
   onChange: (v: string) => void;
   onSubmit: (query: string) => void;
   loading?: boolean;
+  maxResults: number;
+  onMaxResultsChange: (n: number) => void;
 }
 
-export function SearchBar({ value, onChange, onSubmit, loading }: Props) {
+export function SearchBar({ value, onChange, onSubmit, loading, maxResults, onMaxResultsChange }: Props) {
   function handleSubmit() {
     const q = value.trim();
     if (q && !loading) onSubmit(q);
@@ -17,16 +19,6 @@ export function SearchBar({ value, onChange, onSubmit, loading }: Props) {
 
   return (
     <div>
-      <div style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 10.5,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase' as const,
-        color: '#9aa1ab',
-        marginBottom: 9,
-      }}>
-        Ask a research question
-      </div>
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -50,12 +42,33 @@ export function SearchBar({ value, onChange, onSubmit, loading }: Props) {
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontFamily: 'var(--font-serif)',
+            fontFamily: 'var(--font-sans)',
             fontSize: 17,
             color: value ? '#1c2430' : '#9aa1ab',
             background: 'transparent',
           }}
         />
+        <div style={{ width: 1, height: 20, background: '#dbd6c8', flexShrink: 0 }} />
+        <select
+          value={maxResults}
+          onChange={(e) => onMaxResultsChange(Number(e.target.value))}
+          disabled={loading}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: '#5c6470',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            cursor: 'pointer',
+            padding: '0 2px',
+          }}
+          title="Number of results"
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </select>
         <button
           onClick={handleSubmit}
           disabled={loading || !value.trim()}

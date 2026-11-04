@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Header } from '../components/Header';
@@ -8,7 +8,7 @@ import { PipelineSteps } from '../components/PipelineSteps';
 import { AISynthesis } from '../components/AISynthesis';
 import { PaperCard } from '../components/PaperCard';
 import { PaperSkeleton } from '../components/LoadingSpinner';
-import { getQueryHistory } from '../services/api';
+import { getQueryHistory, reopenQuery, regenerateSummary } from '../services/api';
 import type { HistoryItem, PaperResult } from '../types/api.types';
 
 const EXAMPLE_QUERIES = [
@@ -42,12 +42,14 @@ function sortPapers(papers: PaperResult[], order: SortOrder): PaperResult[] {
 export function HomePage() {
   const { token, signOut } = useAuth();
   const navigate = useNavigate();
-  const { step, result, error, isRunning, submitQuery } = useWebSocket(signOut);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { step, result, error, isRunning, submitQuery, loadCachedResult } = useWebSocket(signOut);
 
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [sortOrder, setSortOrder] = useState<SortOrder>('relevance');
   const [recentQueries, setRecentQueries] = useState<HistoryItem[]>([]);
   const [searchValue, setSearchValue] = useState('');
+  const [maxResults, setMaxResults] = useState(20);
 
   // Fetch query history for sidebar
   useEffect(() => {
@@ -57,12 +59,25 @@ export function HomePage() {
       .catch(() => {/* DB may not be set up — silently ignore */});
   }, [token, result]); // refetch after each new result
 
+  // Load cached result when navigated to with ?reopen=queryId
+  useEffect(() => {
+    const queryId = searchParams.get('reopen');
+    if (!queryId || !token) return;
+    reopenQuery(queryId)
+      .then((cached) => {
+        loadCachedResult(cached);
+        if (cached.original_query) setSearchValue(cached.original_query);
+        setSearchParams({}, { replace: true }); // clean URL
+      })
+      .catch(() => {/* cached result unavailable — ignore */});
+  }, [searchParams, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSubmit(query: string) {
     if (!token) return;
     setSearchValue(query);
     setSelectedForCompare(new Set());
     setSortOrder('relevance');
-    submitQuery(query, token);
+    submitQuery(query, token, maxResults);
   }
 
   function toggleCompare(pmid: string, selected: boolean) {
@@ -79,12 +94,25 @@ export function HomePage() {
   const papers = sortPapers(result?.literature_results ?? [], sortOrder);
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', background: '#fff', border: '1px solid #dbd6c8', borderRadius: 3, boxShadow: '0 1px 2px rgba(28,36,48,.04), 0 18px 40px rgba(28,36,48,.08)', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh' }}>
       <Header />
 
       <div style={{ padding: '22px 34px 18px', borderBottom: '1px solid #dbd6c8' }}>
-        <SearchBar value={searchValue} onChange={setSearchValue} onSubmit={handleSubmit} loading={isRunning} />
-        <PipelineSteps currentStep={step} />
+        <SearchBar value={searchValue} onChange={setSearchValue} onSubmit={handleSubmit} loading={isRunning} maxResults={maxResults} onMaxResultsChange={setMaxResults} />
+        {step !== 'idle' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#9aa1ab',
+            }}>
+              Analysis pipeline
+            </span>
+            <PipelineSteps currentStep={step} />
+          </div>
+        )}
       </div>
 
       {/* Pre-query state: full-width history list */}
@@ -114,6 +142,10 @@ export function HomePage() {
               summary={result?.ai_summary ?? null}
               loading={isRunning && step !== 'done'}
               sourcesCount={papers.length}
+              onRegenerate={result?.query_id ? async () => {
+                const { ai_summary } = await regenerateSummary(result.query_id);
+                loadCachedResult({ ...result, ai_summary: ai_summary ?? result.ai_summary });
+              } : undefined}
             />
 
             {/* Papers header with sort controls */}
@@ -253,25 +285,21 @@ function RecentQueriesList({ queries, onSelect }: { queries: HistoryItem[]; onSe
             borderBottom: '1px solid #dbd6c8',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 16,
             cursor: 'pointer',
           }}
           onClick={() => onSelect(q.original_query)}
         >
           <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: '#1c2430' }}>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 15, color: '#1c2430' }}>
               {q.original_query}
             </div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9aa1ab', marginTop: 4 }}>
               {new Date(q.created_at).toLocaleString()}
               {q.total_results > 0 && ` · ${q.total_results} results`}
-              {q.has_ai_summary && ' · gemini-2.5-pro'}
+              {q.has_ai_summary && ' · ai summary'}
             </div>
           </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, color: '#1f7a6c', whiteSpace: 'nowrap' }}>
-            search again →
-          </span>
         </div>
       ))}
     </div>
@@ -327,7 +355,7 @@ function Sidebar({ recentQueries }: { recentQueries: HistoryItem[] }) {
         Recent queries
       </div>
       {recentQueries.length === 0 ? (
-        <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#9aa1ab', fontStyle: 'italic', fontFamily: 'var(--font-serif)' }}>
+        <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#9aa1ab', fontFamily: 'var(--font-sans)' }}>
           Your queries will appear here.
         </div>
       ) : (
@@ -335,7 +363,7 @@ function Sidebar({ recentQueries }: { recentQueries: HistoryItem[] }) {
           <div
             key={q.query_id}
             style={{ padding: '9px 0', borderBottom: '1px solid #dbd6c8', cursor: 'pointer' }}
-            onClick={() => navigate(`/history?reopen=${q.query_id}`)}
+            onClick={() => navigate(`/?reopen=${q.query_id}`)}
           >
             <div style={{ fontSize: 12.5, lineHeight: 1.45, color: '#5c6470' }}>{q.original_query}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#9aa1ab', marginTop: 3 }}>

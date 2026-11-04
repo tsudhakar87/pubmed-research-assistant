@@ -158,6 +158,77 @@ async def get_query_history(
     }
 
 
+@router.post("/{query_id}/synthesize")
+async def regenerate_summary(
+    query_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict:
+    """Re-run AI synthesis on the stored papers for a past query and persist the result."""
+    if not is_db_available():
+        return {"error": "Database not available"}
+
+    from sqlalchemy import select
+    from ...models.database_models import Query as QueryRow
+    from ...utils.error_handlers import NotFoundError
+    from ...agents.response_synthesizer import ResponseSynthesizer
+    from ...models.response_models import PaperResult
+    from datetime import datetime
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(QueryRow).where(
+                QueryRow.query_id == query_id,
+                QueryRow.user_id == current_user.user_id,
+            )
+        )
+        row = result.scalar_one_or_none()
+
+    if row is None:
+        raise NotFoundError("Query", query_id)
+
+    stored = row.result_json or {}
+    papers_raw = stored.get("literature_results", [])
+    if not papers_raw:
+        return {"ai_summary": None}
+
+    papers = []
+    for p in papers_raw:
+        try:
+            pub_date = datetime.fromisoformat(p["publication_date"]) if p.get("publication_date") else None
+            papers.append(PaperResult(
+                title=p.get("title", ""),
+                authors=p.get("authors", []),
+                abstract=p.get("abstract"),
+                journal=p.get("journal"),
+                publication_date=pub_date,
+                pmid=p.get("pmid"),
+                doi=p.get("doi"),
+                keywords=p.get("keywords", []),
+            ))
+        except Exception:
+            continue
+
+    synthesizer = ResponseSynthesizer()
+    new_summary = await synthesizer.synthesize_summary(
+        papers=papers,
+        original_query=stored.get("original_query", ""),
+    )
+
+    # Persist updated summary
+    async with get_session() as session:
+        result = await session.execute(
+            select(QueryRow).where(QueryRow.query_id == query_id)
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            row.ai_summary = new_summary
+            updated_json = dict(row.result_json or {})
+            updated_json["ai_summary"] = new_summary
+            row.result_json = updated_json
+
+    return {"ai_summary": new_summary}
+
+
 @router.get("/history/{query_id}")
 async def reopen_query(
     query_id: str,

@@ -8,6 +8,7 @@ interface UseWebSocketResult {
   error: string | null;
   isRunning: boolean;
   submitQuery: (query: string, token: string, maxResults?: number) => void;
+  loadCachedResult: (response: QueryResponse) => void;
   cancel: () => void;
 }
 
@@ -73,5 +74,13 @@ export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
     [onUnauthorized],
   );
 
-  return { step, result, error, isRunning, submitQuery, cancel };
+  const loadCachedResult = useCallback((response: QueryResponse) => {
+    wsRef.current?.disconnect();
+    setResult(response);
+    setStep('done');
+    setIsRunning(false);
+    setError(null);
+  }, []);
+
+  return { step, result, error, isRunning, submitQuery, loadCachedResult, cancel };
 }

@@ -140,7 +140,7 @@ export function QueryHistoryPage() {
                     marginTop: 5,
                   }}>
                     {new Date(item.created_at).toLocaleString()} · {item.total_results} results
-                    {item.has_ai_summary && ' · gemini-2.5-pro'}
+                    {item.has_ai_summary && ' · ai summary'}
                   </div>
                 </div>
                 <div

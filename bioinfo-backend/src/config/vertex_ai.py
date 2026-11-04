@@ -17,7 +17,7 @@ def get_vertex_ai_config() -> VertexAIConfig:
     return VertexAIConfig(
         project_id=os.environ.get("PROJECT_ID", ""),
         location=os.environ.get("VERTEX_AI_LOCATION", "us-central1"),
-        model_name=os.environ.get("VERTEX_AI_MODEL", "gemini-2.5-flash"),
+        model_name=os.environ.get("VERTEX_AI_MODEL", "gemini-3.8-flash"),
         embedding_model=os.environ.get("VERTEX_AI_EMBEDDING_MODEL", "text-embedding-004"),
     )
 
