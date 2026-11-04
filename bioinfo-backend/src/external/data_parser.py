@@ -3,11 +3,22 @@ Parse NCBI responses into structured data objects
 """
 import logging
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+NO_ABSTRACT = "No abstract available"
+_NCT_RE = re.compile(r"^NCT\d{8}$")
+
+
+def _text(elem: Optional[ET.Element]) -> str:
+    """All text inside an element, including text after inline tags like <i> or <sup>."""
+    if elem is None:
+        return ""
+    return re.sub(r"\s+", " ", "".join(elem.itertext())).strip()
 
 
 @dataclass
@@ -21,6 +32,15 @@ class PubMedArticle:
     publication_date: Optional[datetime] = None
     doi: Optional[str] = None
     keywords: List[str] = None
+    # Curated NLM metadata, e.g. ["Journal Article", "Randomized Controlled Trial"]
+    publication_types: List[str] = field(default_factory=list)
+    # MeSH descriptor names, including check tags like "Humans" or "Animals"
+    mesh_terms: List[str] = field(default_factory=list)
+    # Labeled sections of a structured abstract, e.g. {"RESULTS": "..."}; {} if unstructured
+    abstract_sections: Dict[str, str] = field(default_factory=dict)
+    # ClinicalTrials.gov registry numbers (NCT...) linked to the article
+    trial_ids: List[str] = field(default_factory=list)
+    has_abstract: bool = True
 
     def __post_init__(self):
         if self.keywords is None:
@@ -47,17 +67,25 @@ def parse_pubmed_xml(xml_text: str) -> List[PubMedArticle]:
             pmid = pmid_elem.text if pmid_elem is not None else ""
 
             # Extract title
-            title_elem = article.find(".//ArticleTitle")
-            title = title_elem.text if title_elem is not None else "No title available"
+            # itertext(): .text alone stops at the first inline tag (<i>, <sup>, ...)
+            title = _text(article.find(".//ArticleTitle")) or "No title available"
 
-            # Extract abstract
+            # Extract abstract, keeping section labels of structured abstracts
             abstract_parts = []
+            abstract_sections: Dict[str, str] = {}
             abstract_elem = article.find(".//Abstract")
             if abstract_elem is not None:
                 for text_elem in abstract_elem.findall(".//AbstractText"):
-                    if text_elem.text:
-                        abstract_parts.append(text_elem.text)
-            abstract = " ".join(abstract_parts) if abstract_parts else "No abstract available"
+                    part = _text(text_elem)
+                    if not part:
+                        continue
+                    abstract_parts.append(part)
+                    label = (text_elem.get("Label") or "").strip().upper()
+                    if label:
+                        prev = abstract_sections.get(label)
+                        abstract_sections[label] = f"{prev} {part}" if prev else part
+            has_abstract = bool(abstract_parts)
+            abstract = " ".join(abstract_parts) if has_abstract else NO_ABSTRACT
 
             # Extract authors
             authors = []
@@ -105,6 +133,18 @@ def parse_pubmed_xml(xml_text: str) -> List[PubMedArticle]:
             if keyword_list is not None:
                 keywords = [kw.text for kw in keyword_list.findall(".//Keyword") if kw.text]
 
+            publication_types = [
+                t for t in (_text(e) for e in article.findall(".//PublicationTypeList/PublicationType")) if t
+            ]
+            mesh_terms = [
+                t for t in (_text(e) for e in article.findall(".//MeshHeadingList/MeshHeading/DescriptorName")) if t
+            ]
+            trial_ids = []
+            for accession in article.findall(".//DataBankList/DataBank/AccessionNumberList/AccessionNumber"):
+                acc = _text(accession).upper()
+                if _NCT_RE.match(acc) and acc not in trial_ids:
+                    trial_ids.append(acc)
+
             articles.append(PubMedArticle(
                 pmid=pmid,
                 title=title,
@@ -113,7 +153,12 @@ def parse_pubmed_xml(xml_text: str) -> List[PubMedArticle]:
                 journal=journal,
                 publication_date=pub_date,
                 doi=doi,
-                keywords=keywords
+                keywords=keywords,
+                publication_types=publication_types,
+                mesh_terms=mesh_terms,
+                abstract_sections=abstract_sections,
+                trial_ids=trial_ids,
+                has_abstract=has_abstract,
             ))
 
         except Exception as e:

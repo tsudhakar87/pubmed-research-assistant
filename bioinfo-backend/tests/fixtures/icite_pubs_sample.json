@@ -1,0 +1,10 @@
+{
+  "_comment": "Hand-written fixture in the documented iCite /api/pubs format. Not a real API response.",
+  "meta": {"limit": 2, "offset": 0},
+  "data": [
+    {"pmid": 39000001, "citation_count": 212, "relative_citation_ratio": 3.12,
+     "human": 1.0, "animal": 0.0, "molecular_cellular": 0.0},
+    {"pmid": 39000002, "citation_count": 4, "relative_citation_ratio": null,
+     "human": 0.0, "animal": 0.75, "molecular_cellular": 0.25}
+  ]
+}

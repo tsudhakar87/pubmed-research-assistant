@@ -173,8 +173,7 @@ async def regenerate_summary(
     from ...models.database_models import Query as QueryRow
     from ...utils.error_handlers import NotFoundError
     from ...agents.response_synthesizer import ResponseSynthesizer
-    from ...models.response_models import PaperResult
-    from datetime import datetime
+    from ...models.response_models import EvidenceSummary, PaperResult
 
     async with get_session() as session:
         result = await session.execute(
@@ -193,28 +192,27 @@ async def regenerate_summary(
     if not papers_raw:
         return {"ai_summary": None}
 
+    # Stored JSON is a dumped QueryResponse, so models round-trip (older rows simply
+    # lack the newer fields, which default to empty)
     papers = []
     for p in papers_raw:
         try:
-            pub_date = datetime.fromisoformat(p["publication_date"]) if p.get("publication_date") else None
-            papers.append(PaperResult(
-                title=p.get("title", ""),
-                authors=p.get("authors", []),
-                abstract=p.get("abstract"),
-                journal=p.get("journal"),
-                publication_date=pub_date,
-                pmid=p.get("pmid"),
-                doi=p.get("doi"),
-                keywords=p.get("keywords", []),
-                source=p.get("source"),
-            ))
+            papers.append(PaperResult.model_validate(p))
         except Exception:
             continue
+
+    evidence_summary = None
+    if stored.get("evidence_summary"):
+        try:
+            evidence_summary = EvidenceSummary.model_validate(stored["evidence_summary"])
+        except Exception:
+            evidence_summary = None
 
     synthesizer = ResponseSynthesizer()
     new_summary = await synthesizer.synthesize_summary(
         papers=papers,
         original_query=stored.get("original_query", ""),
+        evidence_summary=evidence_summary,
     )
 
     # Persist updated summary
