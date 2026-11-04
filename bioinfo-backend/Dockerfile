@@ -23,6 +23,8 @@ RUN python -c "import fastapi; import uvicorn; import gunicorn; print('All packa
 
 # Copy application code
 COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./alembic.ini
 
 # Create non-root user for security and set ownership
 RUN useradd -m -u 1000 appuser && \

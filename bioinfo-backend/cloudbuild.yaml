@@ -26,7 +26,40 @@ steps:
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
     id: 'push-latest-tag'
 
-  # Step 3: Deploy to Cloud Run
+  # Step 3: Run database migrations via Cloud Run Jobs (before deploying new code)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        if gcloud run jobs describe db-migrate --region=${_REGION} --quiet 2>/dev/null; then
+          gcloud run jobs update db-migrate \
+            --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID \
+            --region=${_REGION} \
+            --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
+            --set-secrets=DATABASE_URL=database-url:latest \
+            --command=alembic \
+            --args=upgrade,head \
+            --max-retries=0 \
+            --task-timeout=120 \
+            --quiet
+        else
+          gcloud run jobs create db-migrate \
+            --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID \
+            --region=${_REGION} \
+            --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
+            --set-secrets=DATABASE_URL=database-url:latest \
+            --command=alembic \
+            --args=upgrade,head \
+            --max-retries=0 \
+            --task-timeout=120 \
+            --quiet
+        fi
+        gcloud run jobs execute db-migrate --region=${_REGION} --wait
+    id: 'run-migrations'
+    waitFor: ['push-image', 'push-latest-tag']
+
+  # Step 4: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -45,7 +78,7 @@ steps:
       - '--timeout=300'
       - '--concurrency=80'
       - '--add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}'
-      - '--set-env-vars=^;^ENVIRONMENT=production;PROJECT_ID=${PROJECT_ID};GOOGLE_CLOUD_PROJECT=${PROJECT_ID};REGION=${_REGION};VERTEX_AI_LOCATION=${_REGION};VERTEX_AI_MODEL=gemini-2.5-flash;VERTEX_AI_EMBEDDING_MODEL=text-embedding-004;BIGQUERY_DATASET=bioinfo_analytics;GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID};CORS_ORIGINS=${_CORS_ORIGINS}'
+      - '--set-env-vars=^;^ENVIRONMENT=production;PROJECT_ID=${PROJECT_ID};GOOGLE_CLOUD_PROJECT=${PROJECT_ID};REGION=${_REGION};VERTEX_AI_LOCATION=${_REGION};VERTEX_AI_MODEL=gemini-3.8-flash;VERTEX_AI_EMBEDDING_MODEL=text-embedding-004;BIGQUERY_DATASET=bioinfo_analytics;GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID};CORS_ORIGINS=${_CORS_ORIGINS}'
       - '--set-secrets=DATABASE_URL=database-url:latest,JWT_SECRET=jwt-secret:latest,NVIDIA_API_KEY=nvidia-api-key:latest,NCBI_EMAIL=ncbi-email:latest,NCBI_API_KEY=ncbi-api-key:latest'
     id: 'deploy-cloud-run'
 
