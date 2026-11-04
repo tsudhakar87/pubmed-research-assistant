@@ -53,6 +53,21 @@ export class ApiError extends Error {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
+// Set after a successful sign-in so the login page can greet returning users.
+// Only a UX hint: Google sign-in creates the account on first use either way.
+export const RETURNING_USER_KEY = 'has_signed_in';
+
+export function isReturningUser(): boolean {
+  try { return localStorage.getItem(RETURNING_USER_KEY) === '1'; } catch { return false; }
+}
+
+export function setReturningUser(value: boolean): void {
+  try {
+    if (value) localStorage.setItem(RETURNING_USER_KEY, '1');
+    else localStorage.removeItem(RETURNING_USER_KEY);
+  } catch { /* storage unavailable — the hint is optional */ }
+}
+
 export async function authGoogle(idToken: string): Promise<AuthResponse> {
   return request<AuthResponse>('/auth/google', {
     method: 'POST',
@@ -62,6 +77,20 @@ export async function authGoogle(idToken: string): Promise<AuthResponse> {
 
 export async function getMe(): Promise<AuthResponse['user']> {
   return request('/auth/me');
+}
+
+// Fired on window after the user's history is cleared, so open pages can drop stale lists
+export const HISTORY_CLEARED_EVENT = 'pubmed:history-cleared';
+
+export async function clearQueryHistory(): Promise<{ deleted_queries: number }> {
+  const res = await request<{ status: string; deleted_queries: number }>('/auth/history', { method: 'DELETE' });
+  window.dispatchEvent(new Event(HISTORY_CLEARED_EVENT));
+  return res;
+}
+
+// Permanently deletes the account and all saved queries. The caller should sign out after.
+export async function deleteAccount(): Promise<void> {
+  await request('/auth/account', { method: 'DELETE' });
 }
 
 // ── Query ─────────────────────────────────────────────────────────────────────

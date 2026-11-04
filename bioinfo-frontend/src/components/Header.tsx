@@ -1,9 +1,12 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { UserMenu } from './UserMenu';
 
 export function Header() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -38,7 +41,8 @@ export function Header() {
 
       {user && (
         <button
-          onClick={signOut}
+          onClick={() => setMenuOpen(true)}
+          aria-haspopup="dialog"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -51,7 +55,7 @@ export function Header() {
             background: 'transparent',
             cursor: 'pointer',
           }}
-          title="Sign out"
+          title="Account settings"
         >
           <div style={{
             width: 22,
@@ -68,9 +72,11 @@ export function Header() {
           }}>
             {initials}
           </div>
-          <span>Sign out</span>
+          <span>{user.name?.split(' ')[0] || user.email}</span>
+          <span aria-hidden style={{ fontSize: 9, color: '#9aa1ab' }}>▾</span>
         </button>
       )}
+      {menuOpen && <UserMenu onClose={() => setMenuOpen(false)} />}
     </div>
   );
 }

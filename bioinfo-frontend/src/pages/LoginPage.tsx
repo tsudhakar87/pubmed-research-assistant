@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isReturningUser, setReturningUser } from '../services/api';
 
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? '';
 
@@ -47,12 +48,36 @@ function loadGoogleIdentityScript(): Promise<void> {
   return gisScriptPromise;
 }
 
+type EntryMode = 'signin' | 'register';
+
+// Both modes use the same Google flow (the backend creates the account on first
+// sign-in); the mode only changes the wording so new users know where to start.
+const COPY: Record<EntryMode, { heading: string; sub: string; gisText: string; switchPrompt: string; switchAction: string }> = {
+  signin: {
+    heading: 'Welcome back',
+    sub: 'Sign in to pick up your searches and history.',
+    gisText: 'continue_with',
+    switchPrompt: 'New here?',
+    switchAction: 'Create an account',
+  },
+  register: {
+    heading: 'Get started',
+    sub: 'Create a free account with Google to search the literature and get AI-synthesized answers.',
+    gisText: 'signup_with',
+    switchPrompt: 'Already have an account?',
+    switchAction: 'Sign in',
+  },
+};
+
 export function LoginPage() {
   const { signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<EntryMode>(() => (isReturningUser() ? 'signin' : 'register'));
+  const [gisReady, setGisReady] = useState(false);
+  const copy = COPY[mode];
 
   useEffect(() => {
     if (user) navigate('/', { replace: true });
@@ -66,6 +91,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await signInWithGoogle(credential);
+      setReturningUser(true);
       navigate('/', { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign-in failed');
@@ -91,14 +117,7 @@ export function LoginPage() {
           gisInitialized = true;
         }
         activeCredentialHandler = (c) => handleCredentialRef.current(c);
-        if (googleBtnRef.current) {
-          window.google.accounts.id.renderButton(googleBtnRef.current, {
-            theme: 'outline',
-            size: 'large',
-            width: 336,
-            text: 'signin_with',
-          });
-        }
+        setGisReady(true);
       })
       .catch(() => {
         if (!cancelled) setError('Could not load Google sign-in. Check your connection or ad blocker.');
@@ -109,6 +128,19 @@ export function LoginPage() {
       activeCredentialHandler = null;
     };
   }, []);
+
+  // (Re)render the Google button whenever the mode changes its label
+  useEffect(() => {
+    const el = googleBtnRef.current;
+    if (!gisReady || !el || !window.google) return;
+    el.innerHTML = '';
+    window.google.accounts.id.renderButton(el, {
+      theme: 'outline',
+      size: 'large',
+      width: 336,
+      text: copy.gisText,
+    });
+  }, [gisReady, copy.gisText]);
 
   return (
     <div style={{
@@ -163,16 +195,19 @@ export function LoginPage() {
 
         {/* Sign-in body */}
         <div style={{ padding: '28px 32px 30px' }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: '#9aa1ab',
-            marginBottom: 24,
-            textAlign: 'center',
-          }}>
-            Sign in to continue
+          <div style={{ textAlign: 'center', marginBottom: 22 }}>
+            <div style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 600,
+              fontSize: 22,
+              color: '#1c2430',
+              marginBottom: 6,
+            }}>
+              {copy.heading}
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: '#5c6470' }}>
+              {copy.sub}
+            </div>
           </div>
 
           {GOOGLE_CLIENT_ID ? (
@@ -202,9 +237,28 @@ export function LoginPage() {
 
           {loading && (
             <div style={{ textAlign: 'center', color: '#9aa1ab', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-              Signing in…
+              {mode === 'register' ? 'Creating your account…' : 'Signing in…'}
             </div>
           )}
+
+          <div style={{ textAlign: 'center', fontSize: 12.5, color: '#5c6470', margin: '6px 0 16px' }}>
+            {copy.switchPrompt}{' '}
+            <button
+              type="button"
+              onClick={() => { setError(''); setMode(mode === 'signin' ? 'register' : 'signin'); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                font: 'inherit',
+                color: '#1f7a6c',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {copy.switchAction}
+            </button>
+          </div>
 
           <div style={{
             fontFamily: 'var(--font-mono)',
