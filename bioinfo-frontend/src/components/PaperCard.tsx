@@ -34,6 +34,15 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
   const primaryVariant = variants[0];
   const abstract = paper.abstract ?? '';
   const snippet = abstract.length > 220 ? abstract.slice(0, 220) + '…' : abstract;
+  const isPreprint = paper.source === 'biorxiv' || paper.source === 'medrxiv';
+  // Preprints have no PMID, so they link out by DOI instead of to the detail page
+  const doiUrl = paper.doi ? `https://doi.org/${paper.doi}` : null;
+  const fullTextUrl = paper.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/` : doiUrl;
+
+  function openPaper() {
+    if (paper.pmid) navigate(`/paper/${paper.pmid}`);
+    else if (doiUrl) window.open(doiUrl, '_blank', 'noopener,noreferrer');
+  }
 
   function openVariantScore(v: VariantMention) {
     setScoringVariant(v);
@@ -43,7 +52,7 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
   return (
     <>
       <div style={{ padding: '16px 0', borderBottom: '1px solid #dbd6c8' }}>
-        {onSelectForCompare && (
+        {onSelectForCompare && paper.pmid && (
           <label
             title="Select to compare side-by-side with other papers"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8, cursor: 'pointer' }}
@@ -78,9 +87,9 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
               fontSize: 16.5,
               lineHeight: 1.4,
               color: '#1c2430',
-              cursor: 'pointer',
+              cursor: paper.pmid || doiUrl ? 'pointer' : 'default',
             }}
-            onClick={() => paper.pmid && navigate(`/paper/${paper.pmid}`)}
+            onClick={openPaper}
           >
             {paper.title}
           </div>
@@ -103,8 +112,29 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
           color: '#5c6470',
           marginBottom: 8,
         }}>
-          {paper.journal && <span style={{ color: '#155c51' }}>{paper.journal}</span>}
-          {paper.journal && paper.authors.length > 0 && ' · '}
+          {isPreprint ? (
+            <span
+              title="Preprint: not yet peer reviewed"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: 'var(--text-purple)',
+                background: 'var(--bg-purple)',
+                border: '1px solid var(--border-purple)',
+                borderRadius: 3,
+                padding: '1px 5px',
+                marginRight: 6,
+              }}
+            >
+              {paper.source === 'biorxiv' ? 'bioRxiv' : 'medRxiv'} preprint
+            </span>
+          ) : (
+            paper.journal && <span style={{ color: '#155c51' }}>{paper.journal}</span>
+          )}
+          {!isPreprint && paper.journal && paper.authors.length > 0 && ' · '}
           {paper.authors.slice(0, 3).join(', ')}
           {paper.authors.length > 3 && ' et al.'}
           {paper.publication_date && ` · ${paper.publication_date.slice(0, 4)}`}
@@ -117,9 +147,25 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
         )}
 
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          {paper.pmid && (
+          {paper.relevance_score != null && (
+            <span
+              title="Semantic similarity between your query and this paper's title and abstract"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                color: 'var(--text-teal-dark)',
+                background: 'var(--bg-teal)',
+                border: '1px solid var(--border-teal)',
+                borderRadius: 3,
+                padding: '2px 7px',
+              }}
+            >
+              {Math.round(Math.max(0, paper.relevance_score) * 100)}% match
+            </span>
+          )}
+          {fullTextUrl && (
             <a
-              href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
+              href={fullTextUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9aa1ab' }}
@@ -130,12 +176,14 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9aa1ab', cursor: 'pointer' }}>
             ❝ cite
           </span>
-          <span
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9aa1ab', cursor: 'pointer' }}
-            onClick={() => paper.pmid && navigate(`/paper/${paper.pmid}`)}
-          >
-            ⟟ find similar
-          </span>
+          {paper.pmid && (
+            <span
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#9aa1ab', cursor: 'pointer' }}
+              onClick={() => navigate(`/paper/${paper.pmid}`)}
+            >
+              ⟟ find similar
+            </span>
+          )}
 
           {primaryVariant && paper.pmid && (
             <button

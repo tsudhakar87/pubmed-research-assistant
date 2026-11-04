@@ -3,9 +3,12 @@ import type { PipelineStep } from '../types/api.types';
 const STEPS: { key: PipelineStep; label: string }[] = [
   { key: 'classifying', label: '01 · CLASSIFYING' },
   { key: 'searching_pubmed', label: '02 · SEARCHING PUBMED' },
-  { key: 'retrieving_abstracts', label: '03 · RETRIEVING ABSTRACTS' },
-  { key: 'synthesizing', label: '04 · SYNTHESIZING' },
-  { key: 'done', label: '05 · DONE' },
+  // PubMed and preprint searches run in parallel, so this step covers both
+  { key: 'searching_preprints', label: '03 · SEARCHING PUBMED + PREPRINTS' },
+  { key: 'retrieving_abstracts', label: '04 · MERGING RESULTS' },
+  { key: 'scoring_relevance', label: '05 · SCORING RELEVANCE' },
+  { key: 'synthesizing', label: '06 · SYNTHESIZING' },
+  { key: 'done', label: '07 · DONE' },
 ];
 
 interface Props {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -8,8 +8,13 @@ import { PipelineSteps } from '../components/PipelineSteps';
 import { AISynthesis } from '../components/AISynthesis';
 import { PaperCard } from '../components/PaperCard';
 import { PaperSkeleton } from '../components/LoadingSpinner';
-import { getQueryHistory, reopenQuery, regenerateSummary } from '../services/api';
-import type { HistoryItem, PaperResult } from '../types/api.types';
+import { getQueryHistory, getTrends, reopenQuery, regenerateSummary } from '../services/api';
+import type { HistoryItem, PaperResult, TrendPoint } from '../types/api.types';
+
+// recharts is large; load it only when there's a chart to show
+const TrendChart = lazy(() =>
+  import('../components/TrendChart').then((m) => ({ default: m.TrendChart })),
+);
 
 const EXAMPLE_QUERIES = [
   'metformin and gut microbiome',
@@ -50,6 +55,22 @@ export function HomePage() {
   const [recentQueries, setRecentQueries] = useState<HistoryItem[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [maxResults, setMaxResults] = useState(20);
+  const [trendData, setTrendData] = useState<TrendPoint[] | null>(null);
+
+  // Trend data is a separate request, fetched once results are in. Keyed on the
+  // query so re-sorting or regenerating the summary doesn't refetch it.
+  const trendQuery = step === 'done' && result
+    ? (result.refined_query || result.original_query)
+    : null;
+  useEffect(() => {
+    setTrendData(null);
+    if (!trendQuery || !token) return;
+    let cancelled = false;
+    getTrends(trendQuery)
+      .then((data) => { if (!cancelled) setTrendData(data); })
+      .catch(() => {/* trend chart is optional — hide it on failure */});
+    return () => { cancelled = true; };
+  }, [trendQuery, token]);
 
   // Fetch query history for sidebar
   useEffect(() => {
@@ -148,6 +169,12 @@ export function HomePage() {
               } : undefined}
             />
 
+            {trendData && trendData.length > 1 && (
+              <Suspense fallback={null}>
+                <TrendChart data={trendData} />
+              </Suspense>
+            )}
+
             {/* Papers header with sort controls */}
             <div style={{
               fontFamily: 'var(--font-mono)',
@@ -200,7 +227,7 @@ export function HomePage() {
             ) : (
               papers.map((paper, i) => (
                 <PaperCard
-                  key={paper.pmid ?? i}
+                  key={paper.pmid ?? paper.doi ?? i}
                   paper={paper}
                   onSelectForCompare={toggleCompare}
                   selectedForCompare={selectedForCompare.has(paper.pmid ?? '')}

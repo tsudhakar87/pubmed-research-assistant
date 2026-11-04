@@ -74,7 +74,7 @@ class Query(Base):
 
 
 class QueryPaper(Base):
-    """Junction table linking a query to each PubMed paper it returned."""
+    """Junction table linking a query to each paper (PubMed or preprint) it returned."""
 
     __tablename__ = "query_papers"
 
@@ -94,6 +94,8 @@ class QueryPaper(Base):
     # Detected variant mentions in abstract (e.g. ["BRAF V600E"])
     detected_variants: Mapped[Optional[list]] = mapped_column(JSON)
     rank: Mapped[int] = mapped_column(Integer, default=0)
+    # "pubmed" | "biorxiv" | "medrxiv". Preprint rows store pmid as "".
+    source: Mapped[Optional[str]] = mapped_column(String(20))
 
     query: Mapped["Query"] = relationship("Query", back_populates="papers")
 
