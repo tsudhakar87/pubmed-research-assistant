@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # routes
-from .routes import health, query, auth, websocket, papers
+from .routes import health, query, auth, websocket, papers, trends
 from ..config.settings import settings
 from ..utils.logging_config import configure_logging
 from ..utils.error_handlers import register_error_handlers
@@ -56,6 +56,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(query.router, prefix="/api/v1")
 app.include_router(websocket.router, prefix="/api/v1")
 app.include_router(papers.router, prefix="/api/v1")
+app.include_router(trends.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

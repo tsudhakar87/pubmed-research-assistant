@@ -15,7 +15,7 @@ class NCBIClient:
     Async client for NCBI E-utilities API
 
     Primary endpoints used:
-    - ESearch: search and retrieve primary IDs
+    - ESearch: search and retrieve primary IDs, or just a match count
     - EFetch: retrieve full records
     """
 
@@ -140,6 +140,41 @@ class NCBIClient:
             return []
 
         return [id_elem.text for id_elem in id_list.findall("Id")]
+
+    async def count(
+        self,
+        query: str,
+        database: str = "pubmed",
+        min_date: Optional[str] = None,
+        max_date: Optional[str] = None,
+    ) -> int:
+        """
+        Number of records matching a query, optionally within a publication date range.
+        Uses ESearch with rettype=count, so no IDs or records are transferred.
+
+        Args:
+            query: Search query string
+            database: NCBI database (default: pubmed)
+            min_date: Minimum publication date (YYYY/MM/DD, YYYY/MM or YYYY)
+            max_date: Maximum publication date (YYYY/MM/DD, YYYY/MM or YYYY)
+        """
+        params = self._build_params(
+            db=database,
+            term=query,
+            rettype="count",
+            retmode="xml",
+        )
+        if min_date or max_date:
+            params["datetype"] = "pdat"
+            params["mindate"] = min_date or "1800/01/01"
+            params["maxdate"] = max_date or "3000/12/31"
+
+        response_text = await self._make_request("esearch.fcgi", params)
+        root = ET.fromstring(response_text)
+        count_elem = root.find("Count")
+        if count_elem is None or not (count_elem.text or "").strip().isdigit():
+            return 0
+        return int(count_elem.text.strip())
 
     async def fetch_articles(
         self,

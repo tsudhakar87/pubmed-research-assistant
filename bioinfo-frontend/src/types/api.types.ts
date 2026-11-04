@@ -7,8 +7,19 @@ export interface PaperResult {
   pmid?: string;
   doi?: string;
   keywords: string[];
+  // Cosine similarity to the query (0–1). Missing when embeddings were unavailable.
   relevance_score?: number;
+  source?: PaperSource;
   detected_variants?: VariantMention[];
+}
+
+export type PaperSource = 'pubmed' | 'biorxiv' | 'medrxiv';
+
+export interface TrendPoint {
+  year: number;
+  count: number;
+  // True for the current year, whose count is year-to-date
+  partial?: boolean;
 }
 
 export interface VariantMention {
@@ -101,7 +112,9 @@ export type PipelineStep =
   | 'idle'
   | 'classifying'
   | 'searching_pubmed'
+  | 'searching_preprints'
   | 'retrieving_abstracts'
+  | 'scoring_relevance'
   | 'synthesizing'
   | 'done'
   | 'error'

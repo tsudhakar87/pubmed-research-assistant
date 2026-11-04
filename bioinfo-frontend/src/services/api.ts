@@ -5,6 +5,7 @@ import type {
   PaperDetail,
   QueryResponse,
   SimilarQuery,
+  TrendPoint,
   VariantScore,
 } from '../types/api.types';
 
@@ -89,6 +90,13 @@ export async function getSimilarQueries(
   limit = 5,
 ): Promise<{ queries: SimilarQuery[]; method: string }> {
   return request(`/query/similar?q=${encodeURIComponent(q)}&limit=${limit}`);
+}
+
+// Publication counts per year across all of PubMed (not just this result set)
+export async function getTrends(query: string, years = 10): Promise<TrendPoint[]> {
+  const params = new URLSearchParams({ q: query, years: String(years) });
+  const data = await request<{ query: string; data: TrendPoint[] }>(`/trends?${params}`);
+  return data.data;
 }
 
 // ── Papers ────────────────────────────────────────────────────────────────────

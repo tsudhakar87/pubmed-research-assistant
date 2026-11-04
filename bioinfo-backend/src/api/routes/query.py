@@ -78,6 +78,7 @@ async def _persist_query(
                     keywords=paper.keywords,
                     relevance_score=paper.relevance_score,
                     rank=rank,
+                    source=paper.source,
                 ))
 
     await insert_query_event(
@@ -102,9 +103,10 @@ async def research_query(
 
     Pipeline:
     1. Classify query (detect temporal requirements, query type)
-    2. Search PubMed with optimised parameters
-    3. Generate AI synthesis via Gemini
-    4. Persist query + results to Cloud SQL and log event to BigQuery
+    2. Search PubMed, bioRxiv and medRxiv in parallel
+    3. Rank by semantic relevance
+    4. Generate AI synthesis via Gemini
+    5. Persist query + results to Cloud SQL and log event to BigQuery
     """
     query_id = f"q_{uuid.uuid4().hex[:8]}"
     logger.info(
@@ -204,6 +206,7 @@ async def regenerate_summary(
                 pmid=p.get("pmid"),
                 doi=p.get("doi"),
                 keywords=p.get("keywords", []),
+                source=p.get("source"),
             ))
         except Exception:
             continue

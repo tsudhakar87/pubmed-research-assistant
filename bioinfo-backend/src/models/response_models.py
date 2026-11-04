@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 from .request_models import QueryType
 
@@ -14,6 +14,8 @@ class PaperResult(BaseModel):
     doi: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
     relevance_score: Optional[float] = None
+    # Where the record came from. PubMed records also carry a pmid; preprints don't.
+    source: Optional[Literal["pubmed", "biorxiv", "medrxiv"]] = None
 
 class QueryResponse(BaseModel):
     """Main API response"""

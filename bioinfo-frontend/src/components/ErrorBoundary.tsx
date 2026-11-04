@@ -1,6 +1,10 @@
 import { Component, type ReactNode } from 'react';
 
-interface Props { children: ReactNode }
+interface Props {
+  children: ReactNode;
+  // Rendered instead of the default error panel; pass null to render nothing
+  fallback?: ReactNode;
+}
 interface State { hasError: boolean; message: string }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -12,6 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback !== undefined) return this.props.fallback;
       return (
         <div style={{ padding: 40, textAlign: 'center', color: '#5c6470' }}>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, marginBottom: 10 }}>Something went wrong</div>

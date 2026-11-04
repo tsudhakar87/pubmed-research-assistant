@@ -7,8 +7,10 @@ Protocol (client → server):
 Protocol (server → client):
   { "event": "classifying" }
   { "event": "searching_pubmed" }
-  { "event": "retrieving_abstracts" }
-  { "event": "synthesizing" }
+  { "event": "searching_preprints" }    # PubMed + preprint searches now running in parallel
+  { "event": "retrieving_abstracts" }   # merging and de-duplicating
+  { "event": "scoring_relevance" }      # only sent when there are results
+  { "event": "synthesizing" }           # only sent when there are results
   { "event": "done", "data": <QueryResponse JSON> }
   { "event": "error", "message": "..." }
 
@@ -91,6 +93,7 @@ async def _persist(
                     keywords=paper.keywords,
                     relevance_score=paper.relevance_score,
                     rank=rank,
+                    source=paper.source,
                 ))
 
     await insert_query_event(
