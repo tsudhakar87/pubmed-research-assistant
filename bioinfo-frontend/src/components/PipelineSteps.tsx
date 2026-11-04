@@ -7,8 +7,9 @@ const STEPS: { key: PipelineStep; label: string }[] = [
   { key: 'searching_preprints', label: '03 · SEARCHING PUBMED + PREPRINTS' },
   { key: 'retrieving_abstracts', label: '04 · MERGING RESULTS' },
   { key: 'scoring_relevance', label: '05 · SCORING RELEVANCE' },
-  { key: 'synthesizing', label: '06 · SYNTHESIZING' },
-  { key: 'done', label: '07 · DONE' },
+  { key: 'extracting_evidence', label: '06 · READING ABSTRACTS' },
+  { key: 'synthesizing', label: '07 · SYNTHESIZING' },
+  { key: 'done', label: '08 · DONE' },
 ];
 
 interface Props {

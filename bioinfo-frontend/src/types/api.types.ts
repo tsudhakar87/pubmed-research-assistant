@@ -10,16 +10,54 @@ export interface PaperResult {
   // Cosine similarity to the query (0–1). Missing when embeddings were unavailable.
   relevance_score?: number;
   source?: PaperSource;
+  // Citation number used by the AI synthesis ([ref]); fixed backend ranking order
+  ref?: number;
+  publication_types?: string[];
+  mesh_terms?: string[];
+  trial_ids?: string[];
+  citation_count?: number | null;
+  relative_citation_ratio?: number | null;
+  evidence?: Evidence | null;
   detected_variants?: VariantMention[];
 }
 
 export type PaperSource = 'pubmed' | 'biorxiv' | 'medrxiv';
 
-export interface TrendPoint {
-  year: number;
-  count: number;
-  // True for the current year, whose count is year-to-date
-  partial?: boolean;
+export type Stance = 'supports' | 'contradicts' | 'mixed' | 'no_effect' | 'not_applicable';
+export type StudyDesign =
+  | 'meta_analysis' | 'systematic_review' | 'rct' | 'clinical_trial'
+  | 'cohort' | 'case_control' | 'cross_sectional' | 'observational'
+  | 'case_report' | 'review' | 'animal' | 'in_vitro' | 'other';
+export type Organism = 'human' | 'animal' | 'in_vitro' | 'mixed' | 'unknown';
+
+export interface Evidence {
+  design: StudyDesign;
+  design_source: 'pubmed' | 'ai';
+  organism: Organism;
+  organism_source: 'pubmed' | 'icite' | 'ai';
+  sample_size?: number | null;
+  population?: string | null;
+  intervention?: string | null;
+  outcome?: string | null;
+  stance: Stance;
+  key_finding: string;
+  // Verbatim from the abstract; null when the model's quote couldn't be found there
+  finding_quote?: string | null;
+  verified: boolean;
+}
+
+export interface EvidenceSummary {
+  question: string;
+  answerable: boolean;
+  papers_with_evidence: number;
+  stance_counts: Partial<Record<Stance, number>>;
+  stance_by_organism: Partial<Record<Organism, Partial<Record<Stance, number>>>>;
+  design_counts: Partial<Record<StudyDesign, number>>;
+  by_year: Array<{ year: number; total: number } & Partial<Record<Stance, number>>>;
+  gaps: string[];
+  largest_study?: { ref: number; n: number; design: StudyDesign } | null;
+  latest_rct_year?: number | null;
+  preprint_count: number;
 }
 
 export interface VariantMention {
@@ -42,6 +80,7 @@ export interface QueryResponse {
   total_results: number;
   processing_time: number;
   ai_summary?: string;
+  evidence_summary?: EvidenceSummary | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -115,6 +154,7 @@ export type PipelineStep =
   | 'searching_preprints'
   | 'retrieving_abstracts'
   | 'scoring_relevance'
+  | 'extracting_evidence'
   | 'synthesizing'
   | 'done'
   | 'error'

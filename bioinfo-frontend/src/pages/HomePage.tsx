@@ -8,12 +8,14 @@ import { PipelineSteps } from '../components/PipelineSteps';
 import { AISynthesis } from '../components/AISynthesis';
 import { PaperCard } from '../components/PaperCard';
 import { PaperSkeleton } from '../components/LoadingSpinner';
-import { HISTORY_CLEARED_EVENT, getQueryHistory, getTrends, reopenQuery, regenerateSummary } from '../services/api';
-import type { HistoryItem, PaperResult, TrendPoint } from '../types/api.types';
+import { EvidencePanel } from '../components/EvidencePanel';
+import { compareEvidenceStrength } from '../components/evidenceStyles';
+import { HISTORY_CLEARED_EVENT, getQueryHistory, reopenQuery, regenerateSummary } from '../services/api';
+import type { HistoryItem, PaperResult } from '../types/api.types';
 
 // recharts is large; load it only when there's a chart to show
-const TrendChart = lazy(() =>
-  import('../components/TrendChart').then((m) => ({ default: m.TrendChart })),
+const FindingsTimeline = lazy(() =>
+  import('../components/FindingsTimeline').then((m) => ({ default: m.FindingsTimeline })),
 );
 
 const EXAMPLE_QUERIES = [
@@ -22,12 +24,19 @@ const EXAMPLE_QUERIES = [
   'CRISPR off-target rates',
 ];
 
-type SortOrder = 'relevance' | 'newest' | 'oldest';
+type SortOrder = 'relevance' | 'evidence' | 'newest' | 'oldest';
 
 function sortPapers(papers: PaperResult[], order: SortOrder): PaperResult[] {
   const copy = [...papers];
   if (order === 'relevance') {
-    return copy.sort((a, b) => (b.relevance_score ?? 0) - (a.relevance_score ?? 0));
+    // ref is the backend's ranking (relevance, then unscored papers), and what citations use
+    return copy.sort((a, b) =>
+      a.ref != null && b.ref != null
+        ? a.ref - b.ref
+        : (b.relevance_score ?? 0) - (a.relevance_score ?? 0));
+  }
+  if (order === 'evidence') {
+    return copy.sort(compareEvidenceStrength);
   }
   if (order === 'newest') {
     return copy.sort((a, b) => {
@@ -55,22 +64,21 @@ export function HomePage() {
   const [recentQueries, setRecentQueries] = useState<HistoryItem[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [maxResults, setMaxResults] = useState(20);
-  const [trendData, setTrendData] = useState<TrendPoint[] | null>(null);
+  const [highlightedRef, setHighlightedRef] = useState<number | null>(null);
 
-  // Trend data is a separate request, fetched once results are in. Keyed on the
-  // query so re-sorting or regenerating the summary doesn't refetch it.
-  const trendQuery = step === 'done' && result
-    ? (result.refined_query || result.original_query)
-    : null;
+  // Jump to a paper from a [n] citation or a timeline dot, and tint it briefly
+  function goToPaper(ref: number) {
+    requestAnimationFrame(() => {
+      document.getElementById(`paper-${ref}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    setHighlightedRef(ref);
+  }
+
   useEffect(() => {
-    setTrendData(null);
-    if (!trendQuery || !token) return;
-    let cancelled = false;
-    getTrends(trendQuery)
-      .then((data) => { if (!cancelled) setTrendData(data); })
-      .catch(() => {/* trend chart is optional — hide it on failure */});
-    return () => { cancelled = true; };
-  }, [trendQuery, token]);
+    if (highlightedRef == null) return;
+    const t = setTimeout(() => setHighlightedRef(null), 1600);
+    return () => clearTimeout(t);
+  }, [highlightedRef]);
 
   // Fetch query history for sidebar
   useEffect(() => {
@@ -181,12 +189,20 @@ export function HomePage() {
                 const { ai_summary } = await regenerateSummary(result.query_id);
                 loadCachedResult({ ...result, ai_summary: ai_summary ?? result.ai_summary });
               } : undefined}
+              onCite={goToPaper}
             />
 
-            {trendData && trendData.length > 1 && (
-              <Suspense fallback={null}>
-                <TrendChart data={trendData} />
-              </Suspense>
+            {result?.evidence_summary && !showSkeleton && (
+              <>
+                <EvidencePanel summary={result.evidence_summary} />
+                <Suspense fallback={null}>
+                  <FindingsTimeline
+                    papers={result.literature_results}
+                    answerable={result.evidence_summary.answerable}
+                    onSelect={goToPaper}
+                  />
+                </Suspense>
+              </>
             )}
 
             {/* Papers header with sort controls */}
@@ -209,7 +225,7 @@ export function HomePage() {
 
               {/* Sort controls */}
               {papers.length > 1 && !showSkeleton && (
-                <SortPicker value={sortOrder} onChange={setSortOrder} />
+                <SortPicker value={sortOrder} onChange={setSortOrder} hasEvidence={!!result?.evidence_summary} />
               )}
 
               {selectedForCompare.size >= 2 && (
@@ -245,6 +261,7 @@ export function HomePage() {
                   paper={paper}
                   onSelectForCompare={toggleCompare}
                   selectedForCompare={selectedForCompare.has(paper.pmid ?? '')}
+                  highlighted={paper.ref != null && paper.ref === highlightedRef}
                 />
               ))
             )}
@@ -259,12 +276,14 @@ export function HomePage() {
   );
 }
 
-function SortPicker({ value, onChange }: { value: SortOrder; onChange: (v: SortOrder) => void }) {
-  const options: { label: string; value: SortOrder }[] = [
+function SortPicker({ value, onChange, hasEvidence }: { value: SortOrder; onChange: (v: SortOrder) => void; hasEvidence: boolean }) {
+  const allOptions: { label: string; value: SortOrder }[] = [
     { label: 'Relevance', value: 'relevance' },
+    { label: 'Strongest evidence', value: 'evidence' },
     { label: 'Newest', value: 'newest' },
     { label: 'Oldest', value: 'oldest' },
   ];
+  const options = allOptions.filter((o) => hasEvidence || o.value !== 'evidence');
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {options.map((o) => (
