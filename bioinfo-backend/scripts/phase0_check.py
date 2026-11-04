@@ -38,6 +38,7 @@ from src.external.icite_client import _FIELDS, ICITE_PUBS, ICiteClient
 from src.external.ncbi_client import NCBIClient
 from src.external.preprint_client import PreprintClient
 from src.services.evidence_extractor import EvidenceExtractor, build_evidence
+from src.services.gemini_client import get_gemini_client
 
 OUT = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "real"
 
@@ -132,7 +133,10 @@ async def main():
     citations = await check_icite([a.pmid for a in articles])
     await check_preprints(args.query)
     if not args.no_gemini:
-        await check_gemini(args.query, articles, citations)
+        try:
+            await check_gemini(args.query, articles, citations)
+        finally:
+            await get_gemini_client().aclose()
 
 
 if __name__ == "__main__":

@@ -227,6 +227,12 @@ def build_evidence(
 
     sample_size = ex.sample_size if ex.sample_size and ex.sample_size > 0 else None
 
+    # Narrative reviews summarize others' work; they don't test the question themselves.
+    # Models often label them "supports" anyway (seen in Phase 0), which would inflate
+    # the counts, so this is enforced in code. Systematic reviews and meta-analyses
+    # pool data and keep their stance.
+    stance = "not_applicable" if design == "review" else ex.stance
+
     return Evidence(
         design=design,
         design_source=design_source,
@@ -236,7 +242,7 @@ def build_evidence(
         population=ex.population or None,
         intervention=ex.intervention or None,
         outcome=ex.outcome or None,
-        stance=ex.stance,
+        stance=stance,
         key_finding=ex.key_finding.strip(),
         finding_quote=raw.quote,
         verified=raw.quote is not None,

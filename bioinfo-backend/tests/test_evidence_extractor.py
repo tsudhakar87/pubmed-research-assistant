@@ -176,3 +176,27 @@ class TestBuildEvidence:
         ev = build_evidence(raw, _paper())
         assert ev.verified is False and ev.finding_quote is None
         assert ev.sample_size is None
+
+
+class TestReviewStance:
+    """Phase 0: Gemini labeled narrative reviews "supports"; code overrides that."""
+
+    def _raw(self, stance="supports", design="review"):
+        return RawEvidence(extraction=_item(1, stance=stance, design=design), quote=QUOTE)
+
+    def test_pubmed_review_forced_not_applicable(self):
+        ev = build_evidence(self._raw(), _paper(publication_types=["Journal Article", "Review"]))
+        assert (ev.design, ev.stance) == ("review", "not_applicable")
+        assert ev.key_finding  # finding is still shown
+
+    def test_ai_labeled_review_forced_too(self):
+        ev = build_evidence(self._raw(design="review"), _paper())
+        assert ev.stance == "not_applicable"
+
+    def test_meta_analysis_keeps_stance(self):
+        ev = build_evidence(self._raw(design="meta_analysis"), _paper(publication_types=["Review", "Meta-Analysis"]))
+        assert (ev.design, ev.stance) == ("meta_analysis", "supports")
+
+    def test_systematic_review_keeps_stance(self):
+        ev = build_evidence(self._raw(stance="no_effect"), _paper(publication_types=["Systematic Review"]))
+        assert ev.stance == "no_effect"
