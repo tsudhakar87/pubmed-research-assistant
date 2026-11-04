@@ -138,6 +138,14 @@ export function HomePage() {
               Analysis pipeline
             </span>
             <PipelineSteps currentStep={step} />
+            {result?.metadata?.history_saved === false && (
+              <span
+                title="The results are complete, but saving them failed (check the backend logs)."
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--text-amber)' }}
+              >
+                not saved to history
+              </span>
+            )}
           </div>
         )}
       </div>

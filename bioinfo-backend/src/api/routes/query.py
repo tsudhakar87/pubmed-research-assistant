@@ -11,8 +11,7 @@ from ...external.ncbi_client import NCBIClient
 from ...agents.bioinfo_agent import BioinfoAgent
 from ...services.auth_service import TokenPayload, get_current_user
 from ...services.cloud_sql_client import get_session, is_db_available
-from ...services.bigquery_client import insert_query_event
-from ...models.database_models import Query, QueryPaper
+from ...services.query_store import mark_unsaved, save_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/query", tags=["Research"])
@@ -38,58 +37,6 @@ async def get_bioinfo_agent() -> BioinfoAgent:
         ncbi_client = await get_ncbi_client()
         _bioinfo_agent = BioinfoAgent(ncbi_client)
     return _bioinfo_agent
-
-
-async def _persist_query(
-    query_id: str,
-    user_id: Optional[uuid.UUID],
-    response: QueryResponse,
-) -> None:
-    """Save query + paper results to Postgres and log event to BigQuery."""
-    if is_db_available():
-        async with get_session() as session:
-            query_row = Query(
-                query_id=query_id,
-                user_id=user_id,
-                original_query=response.original_query,
-                refined_query=response.refined_query,
-                query_type=response.query_type.value if response.query_type else None,
-                status=response.status,
-                total_results=response.total_results,
-                processing_time_ms=response.processing_time,
-                ai_summary=response.ai_summary,
-                result_json=response.model_dump(mode="json"),
-            )
-            session.add(query_row)
-            await session.flush()  # get query_row.id
-
-            for rank, paper in enumerate(response.literature_results):
-                session.add(QueryPaper(
-                    query_id=query_row.id,
-                    pmid=paper.pmid or "",
-                    title=paper.title,
-                    authors=paper.authors,
-                    journal=paper.journal,
-                    publication_date=(
-                        paper.publication_date.isoformat() if paper.publication_date else None
-                    ),
-                    abstract=paper.abstract,
-                    doi=paper.doi,
-                    keywords=paper.keywords,
-                    relevance_score=paper.relevance_score,
-                    rank=rank,
-                    source=paper.source,
-                ))
-
-    await insert_query_event(
-        query_id=query_id,
-        user_id=user_id,
-        original_query=response.original_query,
-        query_type=response.query_type.value if response.query_type else None,
-        total_results=response.total_results,
-        processing_time_ms=response.processing_time,
-        has_ai_summary=bool(response.ai_summary),
-    )
 
 
 @router.post("/research", response_model=QueryResponse)
@@ -120,7 +67,8 @@ async def research_query(
         include_ai_summary=True,
     )
 
-    await _persist_query(query_id, current_user.user_id, response)
+    if not await save_query(query_id, current_user.user_id, response):
+        response = mark_unsaved(response)
     return response
 
 
