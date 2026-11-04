@@ -94,6 +94,13 @@ class GeminiClient:
             return None
 
 
+    async def aclose(self) -> None:
+        """Close the SDK's HTTP session. The app's singleton lives for the process; scripts should close it."""
+        if self._client is not None:
+            await self._client.aio.aclose()
+            self._client = None
+
+
 _client: Optional[GeminiClient] = None
 
 

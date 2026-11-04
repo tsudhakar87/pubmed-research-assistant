@@ -65,3 +65,18 @@ def test_icite_covers_every_pmid(articles, icite):
     assert all(c.citation_count >= 0 for c in icite.values())
     assert icite["26633628"].citation_count > 1000
     assert icite["26633628"].relative_citation_ratio > 10
+
+
+def test_real_reviews_never_count_toward_stance(articles):
+    # Phase 0: Gemini said "supports" for these three narrative reviews
+    from src.models.response_models import PaperResult
+    from src.services.evidence_extractor import PaperExtraction, RawEvidence, build_evidence
+
+    for pmid in ("30874963", "37603460", "33808194"):
+        a = articles[pmid]
+        paper = PaperResult(title=a.title, authors=a.authors, abstract=a.abstract, pmid=a.pmid,
+                            publication_types=a.publication_types, mesh_terms=a.mesh_terms)
+        item = PaperExtraction(index=1, design="review", organism="human", sample_size=None,
+                               population=None, intervention=None, outcome=None, stance="supports",
+                               key_finding="x", finding_quote="x")
+        assert build_evidence(RawEvidence(extraction=item, quote=None), paper).stance == "not_applicable"
