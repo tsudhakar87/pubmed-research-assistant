@@ -10,6 +10,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
+# Load the same .env the app uses (repo root; see src/api/main.py), without
+# overriding variables already set in the shell.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+except ImportError:
+    pass
+
 # Make sure the src package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -24,7 +32,12 @@ target_metadata = Base.metadata
 
 
 def _get_url() -> str:
-    url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url", ""))
+    url = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url", "")
+    if not url or url.startswith("driver://"):
+        raise RuntimeError(
+            "No database URL: set DATABASE_URL in the environment or in the repo-root .env "
+            "(e.g. postgresql+asyncpg://user:pass@127.0.0.1:5432/bioinfo_db)."
+        )
     # Normalise to asyncpg driver
     url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     url = url.replace("postgres://", "postgresql+asyncpg://", 1)
