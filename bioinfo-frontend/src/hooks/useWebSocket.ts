@@ -19,6 +19,7 @@ const STEP_ORDER: PipelineStep[] = [
   'searching_preprints',
   'retrieving_abstracts',
   'scoring_relevance',
+  'extracting_evidence',
   'synthesizing',
   'done',
 ];

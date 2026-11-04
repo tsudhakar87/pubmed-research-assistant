@@ -1,12 +1,89 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PaperResult, VariantMention } from '../types/api.types';
+import type { Evidence, PaperResult, VariantMention } from '../types/api.types';
 import { VariantScoringModal } from './VariantScoringModal';
+import { DESIGN_LABEL, ORGANISM_LABEL, STANCE_COLOR, STANCE_LABEL } from './evidenceStyles';
 
 interface Props {
   paper: PaperResult;
   onSelectForCompare?: (pmid: string, selected: boolean) => void;
   selectedForCompare?: boolean;
+  // Briefly tinted after jumping here from a citation or timeline dot
+  highlighted?: boolean;
+}
+
+const chip = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  padding: '1px 6px',
+  borderRadius: 3,
+  border: '1px solid var(--border-default)',
+  background: 'var(--bg-muted)',
+  color: 'var(--text-secondary)',
+  whiteSpace: 'nowrap' as const,
+};
+
+function sourceNote(source: string): string {
+  return source === 'ai' ? 'Labeled by AI from the abstract' : source === 'icite' ? 'From NIH iCite' : 'From PubMed indexing';
+}
+
+function EvidenceRow({ evidence }: { evidence: Evidence }) {
+  const [showQuote, setShowQuote] = useState(false);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+        <span style={chip} title={sourceNote(evidence.design_source)}>
+          {DESIGN_LABEL[evidence.design]}{evidence.design_source === 'ai' && <sup style={{ marginLeft: 2 }}>ai</sup>}
+        </span>
+        <span style={chip} title={sourceNote(evidence.organism_source)}>
+          {ORGANISM_LABEL[evidence.organism]}{evidence.organism_source === 'ai' && <sup style={{ marginLeft: 2 }}>ai</sup>}
+        </span>
+        {evidence.sample_size != null && (
+          <span style={chip}>n = {evidence.sample_size.toLocaleString()}</span>
+        )}
+        {evidence.stance !== 'not_applicable' && (
+          <span style={{
+            ...chip,
+            fontWeight: 600,
+            color: '#fff',
+            background: STANCE_COLOR[evidence.stance],
+            borderColor: STANCE_COLOR[evidence.stance],
+          }}>
+            {STANCE_LABEL[evidence.stance]}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-navy)' }}>
+        {evidence.key_finding}{' '}
+        {evidence.verified ? (
+          <button
+            onClick={() => setShowQuote((v) => !v)}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-teal)',
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            }}
+          >
+            {showQuote ? 'hide quote' : 'show quote'}
+          </button>
+        ) : (
+          <span
+            title="The AI's supporting quote wasn't found word-for-word in the abstract. Check the abstract before relying on this."
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-amber)' }}
+          >
+            not verified
+          </span>
+        )}
+      </div>
+      {showQuote && evidence.finding_quote && (
+        <blockquote style={{
+          margin: '6px 0 0', padding: '4px 0 4px 10px', borderLeft: '2px solid var(--border-teal)',
+          fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 13.5, color: 'var(--text-secondary)',
+        }}>
+          “{evidence.finding_quote}”
+        </blockquote>
+      )}
+    </div>
+  );
 }
 
 function highlightVariants(text: string, variants: VariantMention[]): React.ReactNode {
@@ -25,7 +102,7 @@ function highlightVariants(text: string, variants: VariantMention[]): React.Reac
   );
 }
 
-export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Props) {
+export function PaperCard({ paper, onSelectForCompare, selectedForCompare, highlighted }: Props) {
   const navigate = useNavigate();
   const [scoringOpen, setScoringOpen] = useState(false);
   const [scoringVariant, setScoringVariant] = useState<VariantMention | null>(null);
@@ -51,7 +128,17 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
 
   return (
     <>
-      <div style={{ padding: '16px 0', borderBottom: '1px solid #dbd6c8' }}>
+      <div
+        id={paper.ref != null ? `paper-${paper.ref}` : undefined}
+        style={{
+          padding: '16px 10px',
+          margin: '0 -10px',
+          borderBottom: '1px solid #dbd6c8',
+          scrollMarginTop: 24,
+          background: highlighted ? 'var(--bg-teal)' : 'transparent',
+          transition: 'background 0.6s',
+        }}
+      >
         {onSelectForCompare && paper.pmid && (
           <label
             title="Select to compare side-by-side with other papers"
@@ -91,6 +178,11 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
             }}
             onClick={openPaper}
           >
+            {paper.ref != null && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 400, color: '#9aa1ab', marginRight: 6 }}>
+                [{paper.ref}]
+              </span>
+            )}
             {paper.title}
           </div>
           {paper.pmid && (
@@ -140,7 +232,9 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
           {paper.publication_date && ` · ${paper.publication_date.slice(0, 4)}`}
         </div>
 
-        {snippet && (
+        {paper.evidence && <EvidenceRow evidence={paper.evidence} />}
+
+        {snippet && !paper.evidence && (
           <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#5c6470', marginBottom: 10 }}>
             {highlightVariants(snippet, variants)}
           </div>
@@ -161,6 +255,17 @@ export function PaperCard({ paper, onSelectForCompare, selectedForCompare }: Pro
               }}
             >
               {Math.round(Math.max(0, paper.relevance_score) * 100)}% match
+            </span>
+          )}
+          {paper.citation_count != null && (
+            <span
+              title={paper.relative_citation_ratio != null
+                ? 'Relative Citation Ratio: citations compared with papers in the same field (1.0 = field average), from NIH iCite'
+                : 'Citation count from NIH iCite'}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#5c6470' }}
+            >
+              {paper.citation_count.toLocaleString()} citations
+              {paper.relative_citation_ratio != null && ` · RCR ${paper.relative_citation_ratio.toFixed(1)}`}
             </span>
           )}
           {fullTextUrl && (

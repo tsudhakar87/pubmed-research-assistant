@@ -5,9 +5,48 @@ interface Props {
   loading?: boolean;
   sourcesCount?: number;
   onRegenerate?: () => Promise<void>;
+  // Called with a paper's ref number when a [n] citation is clicked
+  onCite?: (ref: number) => void;
 }
 
-export function AISynthesis({ summary, loading, sourcesCount, onRegenerate }: Props) {
+const CITATION = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+
+// Turns "[2, 5]" in the summary into buttons that jump to those papers
+function withCitations(text: string, onCite?: (ref: number) => void): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(CITATION)) {
+    out.push(text.slice(last, m.index));
+    const refs = m[1].split(',').map((n) => Number(n.trim()));
+    out.push(
+      <span key={m.index} style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'nowrap' }}>
+        [
+        {refs.map((ref, i) => (
+          <span key={ref}>
+            {i > 0 && ', '}
+            {onCite ? (
+              <button
+                onClick={() => onCite(ref)}
+                style={{
+                  font: 'inherit', color: 'var(--text-teal)', background: 'none', border: 'none',
+                  padding: 0, cursor: 'pointer', textDecoration: 'underline dotted',
+                }}
+              >
+                {ref}
+              </button>
+            ) : ref}
+          </span>
+        ))}
+        ]
+      </span>,
+    );
+    last = (m.index ?? 0) + m[0].length;
+  }
+  out.push(text.slice(last));
+  return out;
+}
+
+export function AISynthesis({ summary, loading, sourcesCount, onRegenerate, onCite }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
@@ -96,7 +135,7 @@ export function AISynthesis({ summary, loading, sourcesCount, onRegenerate }: Pr
           </>
         ) : (
           <div style={{ fontSize: 14.5, lineHeight: 1.65, color: '#1c2430', whiteSpace: 'pre-wrap' }}>
-            {summary}
+            {summary ? withCitations(summary, onCite) : summary}
           </div>
         )
       )}
