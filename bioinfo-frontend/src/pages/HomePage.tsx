@@ -8,7 +8,7 @@ import { PipelineSteps } from '../components/PipelineSteps';
 import { AISynthesis } from '../components/AISynthesis';
 import { PaperCard } from '../components/PaperCard';
 import { PaperSkeleton } from '../components/LoadingSpinner';
-import { getQueryHistory, reopenQuery, regenerateSummary } from '../services/api';
+import { HISTORY_CLEARED_EVENT, getQueryHistory, reopenQuery, regenerateSummary } from '../services/api';
 import type { HistoryItem, PaperResult } from '../types/api.types';
 
 const EXAMPLE_QUERIES = [
@@ -58,6 +58,12 @@ export function HomePage() {
       .then((data) => setRecentQueries(data.queries))
       .catch(() => {/* DB may not be set up — silently ignore */});
   }, [token, result]); // refetch after each new result
+
+  useEffect(() => {
+    const onCleared = () => setRecentQueries([]);
+    window.addEventListener(HISTORY_CLEARED_EVENT, onCleared);
+    return () => window.removeEventListener(HISTORY_CLEARED_EVENT, onCleared);
+  }, []);
 
   // Load cached result when navigated to with ?reopen=queryId
   useEffect(() => {
