@@ -34,7 +34,7 @@ except ImportError:
 from src.agents.bioinfo_agent import BioinfoAgent
 from src.config.settings import settings
 from src.external.data_parser import parse_pubmed_xml
-from src.external.icite_client import ICITE_PUBS, ICiteClient
+from src.external.icite_client import _FIELDS, ICITE_PUBS, ICiteClient
 from src.external.ncbi_client import NCBIClient
 from src.external.preprint_client import PreprintClient
 from src.services.evidence_extractor import EvidenceExtractor, build_evidence
@@ -70,7 +70,7 @@ async def check_icite(pmids):
     client = ICiteClient()
     try:
         session = await client._get_session()
-        async with session.get(ICITE_PUBS, params={"pmids": ",".join(pmids)}) as resp:
+        async with session.get(ICITE_PUBS, params={"pmids": ",".join(pmids), "fl": _FIELDS + ",year,title"}) as resp:
             raw = await resp.json(content_type=None)
         (OUT / "icite_pubs.json").write_text(json.dumps(raw, indent=1))
         print(f"Saved {OUT / 'icite_pubs.json'}")
