@@ -1,0 +1,87 @@
+<?xml version="1.0" ?>
+<!-- Hand-written fixture following the PubMed EFetch XML (pubmed_250101.dtd) structure.
+     Not a real API response. Replace with saved responses from scripts/phase0_check.py. -->
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">39000001</PMID>
+      <Article PubModel="Print-Electronic">
+        <Journal>
+          <Title>Diabetes Care</Title>
+          <JournalIssue CitedMedium="Internet"><PubDate><Year>2024</Year><Month>Mar</Month><Day>05</Day></PubDate></JournalIssue>
+        </Journal>
+        <ArticleTitle>Metformin and <i>Akkermansia muciniphila</i> abundance: a randomized trial</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">Metformin may act partly through the gut microbiome.</AbstractText>
+          <AbstractText Label="METHODS" NlmCategory="METHODS">We randomized 240 adults with type 2 diabetes to metformin or placebo for 12 weeks.</AbstractText>
+          <AbstractText Label="RESULTS" NlmCategory="RESULTS">Metformin increased <i>A. muciniphila</i> relative abundance by 2.1-fold (p&lt;0.001) compared with placebo.</AbstractText>
+          <AbstractText Label="CONCLUSIONS" NlmCategory="CONCLUSIONS">Metformin alters gut microbiome composition in humans.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y"><LastName>Rivera</LastName><ForeName>Ana</ForeName></Author>
+          <Author ValidYN="Y"><LastName>Okafor</LastName><ForeName>Chidi</ForeName></Author>
+        </AuthorList>
+        <DataBankList CompleteYN="Y">
+          <DataBank>
+            <DataBankName>ClinicalTrials.gov</DataBankName>
+            <AccessionNumberList><AccessionNumber>NCT04123456</AccessionNumber></AccessionNumberList>
+          </DataBank>
+        </DataBankList>
+        <PublicationTypeList>
+          <PublicationType UI="D016428">Journal Article</PublicationType>
+          <PublicationType UI="D016449">Randomized Controlled Trial</PublicationType>
+        </PublicationTypeList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName UI="D006801" MajorTopicYN="N">Humans</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName UI="D008687" MajorTopicYN="Y">Metformin</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName UI="D000069196" MajorTopicYN="Y">Gastrointestinal Microbiome</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+      <KeywordList Owner="NOTNLM"><Keyword MajorTopicYN="N">microbiome</Keyword></KeywordList>
+    </MedlineCitation>
+    <PubmedData>
+      <ArticleIdList>
+        <ArticleId IdType="pubmed">39000001</ArticleId>
+        <ArticleId IdType="doi">10.2337/dc23-0001</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">39000002</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <Title>Gut Microbes</Title>
+          <JournalIssue><PubDate><Year>2021</Year><Month>11</Month></PubDate></JournalIssue>
+        </Journal>
+        <ArticleTitle>Metformin does not change Bacteroides levels in high-fat-fed mice</ArticleTitle>
+        <Abstract>
+          <AbstractText>Male C57BL/6 mice (n=24) on a high-fat diet received metformin for 8 weeks. Bacteroides abundance did not differ from controls. Fasting glucose fell by 18%, with CO<sub>2</sub> output unchanged.</AbstractText>
+        </Abstract>
+        <AuthorList><Author><LastName>Lindqvist</LastName><ForeName>Erik</ForeName></Author></AuthorList>
+        <PublicationTypeList><PublicationType UI="D016428">Journal Article</PublicationType></PublicationTypeList>
+      </Article>
+      <MeshHeadingList>
+        <MeshHeading><DescriptorName UI="D000818" MajorTopicYN="N">Animals</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName UI="D051379" MajorTopicYN="N">Mice</DescriptorName></MeshHeading>
+        <MeshHeading><DescriptorName UI="D008297" MajorTopicYN="N">Male</DescriptorName></MeshHeading>
+      </MeshHeadingList>
+    </MedlineCitation>
+    <PubmedData><ArticleIdList><ArticleId IdType="pubmed">39000002</ArticleId></ArticleIdList></PubmedData>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="PubMed-not-MEDLINE" Owner="NLM">
+      <PMID Version="1">39000003</PMID>
+      <Article PubModel="Electronic">
+        <Journal><Title>Lancet</Title><JournalIssue><PubDate><Year>2025</Year></PubDate></JournalIssue></Journal>
+        <ArticleTitle>Correction to: gut microbiome and glucose-lowering drugs</ArticleTitle>
+        <AuthorList><Author><CollectiveName>Lancet Editors</CollectiveName></Author></AuthorList>
+        <PublicationTypeList>
+          <PublicationType UI="D016428">Journal Article</PublicationType>
+          <PublicationType UI="D016425">Published Erratum</PublicationType>
+        </PublicationTypeList>
+      </Article>
+    </MedlineCitation>
+    <PubmedData><ArticleIdList><ArticleId IdType="pubmed">39000003</ArticleId></ArticleIdList></PubmedData>
+  </PubmedArticle>
+</PubmedArticleSet>

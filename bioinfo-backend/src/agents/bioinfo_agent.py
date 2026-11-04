@@ -1,18 +1,21 @@
 """
 Main orchestrator agent for bioinformatics research tasks.
 Coordinates query classification, PubMed + preprint search, relevance scoring,
-and response synthesis.
+evidence extraction, and grounded response synthesis.
 Supports an optional async progress_callback for WebSocket streaming.
 """
-from typing import Any, Callable, Coroutine, List, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 import asyncio
 import time
 
 from ..models.request_models import BioinformaticsQuery
-from ..models.response_models import QueryResponse, PaperResult
+from ..models.response_models import EvidenceSummary, QueryResponse, PaperResult
 from ..external.ncbi_client import NCBIClient
+from ..external.icite_client import CitationInfo, ICiteClient
 from ..external.preprint_client import PreprintClient, PreprintArticle
 from ..services.embedding_service import EmbeddingService, get_embedding_service
+from ..services.evidence_aggregator import summarize
+from ..services.evidence_extractor import EvidenceExtractor, FramedQuestion, RawEvidence, build_evidence
 from ..utils.embeddings import normalize_doi, normalize_title
 from .query_classifier import QueryClassifier, QueryAnalysis
 from .response_synthesizer import ResponseSynthesizer
@@ -31,7 +34,8 @@ class BioinfoAgent:
     2. Searches PubMed, bioRxiv and medRxiv in parallel
     3. Merges results, dropping preprints already in PubMed
     4. Ranks by semantic similarity to the query
-    5. Synthesizes results with AI-generated summaries
+    5. Extracts per-paper evidence (Gemini) and citation data (iCite), then aggregates it
+    6. Synthesizes a cited summary grounded in that evidence
     """
 
     def __init__(
@@ -39,12 +43,17 @@ class BioinfoAgent:
         ncbi_client: NCBIClient,
         preprint_client: Optional[PreprintClient] = None,
         embedding_service: Optional[EmbeddingService] = None,
+        icite_client: Optional[ICiteClient] = None,
+        evidence_extractor: Optional[EvidenceExtractor] = None,
+        response_synthesizer: Optional[ResponseSynthesizer] = None,
     ):
         self.ncbi_client = ncbi_client
         self.preprint_client = preprint_client or PreprintClient()
         self.embedding_service = embedding_service or get_embedding_service()
+        self.icite_client = icite_client or ICiteClient()
+        self.evidence_extractor = evidence_extractor or EvidenceExtractor()
         self.query_classifier = QueryClassifier()
-        self.response_synthesizer = ResponseSynthesizer()
+        self.response_synthesizer = response_synthesizer or ResponseSynthesizer()
 
     async def process_query(
         self,
@@ -118,13 +127,31 @@ class BioinfoAgent:
                 query_request.query, paper_results
             )
 
-        # Step 5: Generate AI summary
+        # Fix citation numbers now: the synthesis cites [ref] and the UI shows it on each card
+        paper_results = [p.model_copy(update={"ref": i}) for i, p in enumerate(paper_results, 1)]
+
+        # Step 5: Citation data and structured evidence, in parallel
+        evidence_summary: Optional[EvidenceSummary] = None
+        if paper_results:
+            extract = include_ai_summary and self.evidence_extractor.available
+            if extract:
+                await emit("extracting_evidence")
+            citations, (framed, raw) = await asyncio.gather(
+                self.icite_client.fetch([p.pmid for p in paper_results if p.pmid]),
+                self._extract_evidence(query_request.query, paper_results) if extract else _no_evidence(),
+            )
+            paper_results = self._attach_evidence(paper_results, citations, raw)
+            if framed is not None and raw:
+                evidence_summary = summarize(paper_results, framed.question, framed.answerable)
+
+        # Step 6: Generate AI summary
         ai_summary = None
         if include_ai_summary and paper_results:
             await emit("synthesizing")
             ai_summary = await self.response_synthesizer.synthesize_summary(
                 papers=paper_results,
                 original_query=query_request.query,
+                evidence_summary=evidence_summary,
             )
 
         processing_time = int((time.time() - start_time) * 1000)
@@ -138,6 +165,7 @@ class BioinfoAgent:
             total_results=len(paper_results),
             processing_time=processing_time,
             ai_summary=ai_summary,
+            evidence_summary=evidence_summary,
             metadata={
                 "sort_by": query_analysis.sort_by,
                 "temporal_context": query_analysis.temporal_context,
@@ -147,6 +175,32 @@ class BioinfoAgent:
                 } if query_analysis.min_date or query_analysis.max_date else None,
             },
         )
+
+    async def _extract_evidence(
+        self, query: str, papers: List[PaperResult]
+    ) -> Tuple[Optional[FramedQuestion], Dict[int, RawEvidence]]:
+        framed = await self.evidence_extractor.frame_question(query)
+        if framed is None:
+            return None, {}
+        return framed, await self.evidence_extractor.extract(framed, papers)
+
+    @staticmethod
+    def _attach_evidence(
+        papers: List[PaperResult],
+        citations: Dict[str, CitationInfo],
+        raw: Dict[int, RawEvidence],
+    ) -> List[PaperResult]:
+        out = []
+        for i, paper in enumerate(papers):
+            citation = citations.get(paper.pmid) if paper.pmid else None
+            update: dict = {}
+            if citation:
+                update["citation_count"] = citation.citation_count
+                update["relative_citation_ratio"] = citation.relative_citation_ratio
+            if i in raw:
+                update["evidence"] = build_evidence(raw[i], paper, citation)
+            out.append(paper.model_copy(update=update) if update else paper)
+        return out
 
     async def _search_literature(self, analysis: QueryAnalysis, max_results: int) -> List:
         search_kwargs = {"sort": analysis.sort_by}
@@ -174,6 +228,10 @@ class BioinfoAgent:
                 keywords=article.keywords,
                 relevance_score=None,
                 source="pubmed",
+                publication_types=article.publication_types,
+                mesh_terms=article.mesh_terms,
+                trial_ids=article.trial_ids,
+                abstract_sections=article.abstract_sections,
             )
             for article in pubmed_articles
         ]
@@ -238,3 +296,7 @@ class BioinfoAgent:
             min_date=min_date,
         )
         return self._convert_to_paper_results(articles)
+
+
+async def _no_evidence() -> Tuple[None, Dict[int, RawEvidence]]:
+    return None, {}

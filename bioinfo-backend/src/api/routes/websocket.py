@@ -10,6 +10,7 @@ Protocol (server → client):
   { "event": "searching_preprints" }    # PubMed + preprint searches now running in parallel
   { "event": "retrieving_abstracts" }   # merging and de-duplicating
   { "event": "scoring_relevance" }      # only sent when there are results
+  { "event": "extracting_evidence" }    # only sent when there are results and Gemini is configured
   { "event": "synthesizing" }           # only sent when there are results
   { "event": "done", "data": <QueryResponse JSON> }
   { "event": "error", "message": "..." }
