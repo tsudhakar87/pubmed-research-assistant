@@ -57,14 +57,17 @@ export function HomePage() {
   const { token, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { step, result, error, isRunning, submitQuery, loadCachedResult } = useWebSocket(signOut);
+  const { step, result, error, isRunning, earlyPapers, submitQuery, loadCachedResult } = useWebSocket(signOut);
 
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [sortOrder, setSortOrder] = useState<SortOrder>('relevance');
   const [recentQueries, setRecentQueries] = useState<HistoryItem[]>([]);
   const [searchValue, setSearchValue] = useState('');
-  const [maxResults, setMaxResults] = useState(20);
   const [highlightedRef, setHighlightedRef] = useState<number | null>(null);
+  const [aiCollapsed, setAiCollapsed] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   // Jump to a paper from a [n] citation or a timeline dot, and tint it briefly
   function goToPaper(ref: number) {
@@ -112,7 +115,8 @@ export function HomePage() {
     setSearchValue(query);
     setSelectedForCompare(new Set());
     setSortOrder('relevance');
-    submitQuery(query, token, maxResults);
+    setPage(1);
+    submitQuery(query, token, 20);
   }
 
   function toggleCompare(pmid: string, selected: boolean) {
@@ -126,14 +130,16 @@ export function HomePage() {
 
   const showSkeleton = isRunning && step !== 'done';
   const showResults = result || showSkeleton;
-  const papers = sortPapers(result?.literature_results ?? [], sortOrder);
+  const papers = sortPapers(result?.literature_results ?? earlyPapers, sortOrder);
+  const totalPages = Math.ceil(papers.length / PAGE_SIZE);
+  const pagedPapers = papers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div style={{ minHeight: '100vh' }}>
       <Header />
 
       <div style={{ padding: '22px 34px 18px', borderBottom: '1px solid #dbd6c8' }}>
-        <SearchBar value={searchValue} onChange={setSearchValue} onSubmit={handleSubmit} loading={isRunning} maxResults={maxResults} onMaxResultsChange={setMaxResults} />
+        <SearchBar value={searchValue} onChange={setSearchValue} onSubmit={handleSubmit} loading={isRunning} />
         {step !== 'idle' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
             <span style={{
@@ -190,9 +196,11 @@ export function HomePage() {
                 loadCachedResult({ ...result, ai_summary: ai_summary ?? result.ai_summary });
               } : undefined}
               onCite={goToPaper}
+              collapsed={aiCollapsed}
+              onToggleCollapsed={() => setAiCollapsed(c => !c)}
             />
 
-            {result?.evidence_summary && !showSkeleton && (
+            {!aiCollapsed && result?.evidence_summary && !showSkeleton && (
               <>
                 <EvidencePanel summary={result.evidence_summary} />
                 <Suspense fallback={null}>
@@ -255,7 +263,7 @@ export function HomePage() {
                 <PaperSkeleton />
               </>
             ) : (
-              papers.map((paper, i) => (
+              pagedPapers.map((paper, i) => (
                 <PaperCard
                   key={paper.pmid ?? paper.doi ?? i}
                   paper={paper}
@@ -264,6 +272,22 @@ export function HomePage() {
                   highlighted={paper.ref != null && paper.ref === highlightedRef}
                 />
               ))
+            )}
+
+            {totalPages > 1 && !showSkeleton && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '18px 0 8px', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  style={{ background: 'transparent', border: '1px solid #dbd6c8', borderRadius: 3, padding: '4px 10px', cursor: page === 1 ? 'not-allowed' : 'pointer', color: page === 1 ? '#9aa1ab' : '#1c2430', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                >← prev</button>
+                <span style={{ color: '#9aa1ab' }}>{page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  style={{ background: 'transparent', border: '1px solid #dbd6c8', borderRadius: 3, padding: '4px 10px', cursor: page === totalPages ? 'not-allowed' : 'pointer', color: page === totalPages ? '#9aa1ab' : '#1c2430', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                >next →</button>
+              </div>
             )}
             </>
           )}

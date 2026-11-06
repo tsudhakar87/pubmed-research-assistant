@@ -7,6 +7,8 @@ interface Props {
   onRegenerate?: () => Promise<void>;
   // Called with a paper's ref number when a [n] citation is clicked
   onCite?: (ref: number) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 const CITATION = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
@@ -46,8 +48,7 @@ function withCitations(text: string, onCite?: (ref: number) => void): React.Reac
   return out;
 }
 
-export function AISynthesis({ summary, loading, sourcesCount, onRegenerate, onCite }: Props) {
-  const [collapsed, setCollapsed] = useState(false);
+export function AISynthesis({ summary, loading, sourcesCount, onRegenerate, onCite, collapsed, onToggleCollapsed }: Props) {
   const [regenerating, setRegenerating] = useState(false);
 
   async function handleRegenerate() {
@@ -88,7 +89,7 @@ export function AISynthesis({ summary, loading, sourcesCount, onRegenerate, onCi
           {!loading && (
             <>
               <button
-                onClick={() => setCollapsed((c) => !c)}
+                onClick={() => onToggleCollapsed()}
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: 10,

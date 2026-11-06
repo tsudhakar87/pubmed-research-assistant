@@ -130,6 +130,10 @@ class BioinfoAgent:
         # Fix citation numbers now: the synthesis cites [ref] and the UI shows it on each card
         paper_results = [p.model_copy(update={"ref": i}) for i, p in enumerate(paper_results, 1)]
 
+        # Emit papers immediately so the frontend can render while AI runs
+        if paper_results:
+            await emit("papers_ready", {"papers": [p.model_dump(mode="json") for p in paper_results]})
+
         # Step 5: Citation data and structured evidence, in parallel
         evidence_summary: Optional[EvidenceSummary] = None
         if paper_results:

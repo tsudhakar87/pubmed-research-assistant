@@ -1,12 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { QueryWebSocket } from '../services/websocket';
-import type { PipelineStep, QueryResponse } from '../types/api.types';
+import type { PaperResult, PipelineStep, QueryResponse } from '../types/api.types';
 
 interface UseWebSocketResult {
   step: PipelineStep;
   result: QueryResponse | null;
   error: string | null;
   isRunning: boolean;
+  earlyPapers: PaperResult[];
   submitQuery: (query: string, token: string, maxResults?: number) => void;
   loadCachedResult: (response: QueryResponse) => void;
   cancel: () => void;
@@ -32,6 +33,7 @@ export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [earlyPapers, setEarlyPapers] = useState<PaperResult[]>([]);
   const wsRef = useRef<QueryWebSocket | null>(null);
 
   const cancel = useCallback(() => {
@@ -46,6 +48,7 @@ export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
       wsRef.current?.disconnect();
       setResult(null);
       setError(null);
+      setEarlyPapers([]);
       setStep('classifying');
       setIsRunning(true);
 
@@ -61,6 +64,9 @@ export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
             setError(data?.message ?? 'An error occurred');
             setStep('error');
             setIsRunning(false);
+          } else if (evt === 'papers_ready') {
+            const data = event.data as unknown as { papers: PaperResult[] };
+            setEarlyPapers(data.papers ?? []);
           } else if (STEP_ORDER.includes(evt)) {
             setStep(evt);
           }
@@ -85,5 +91,5 @@ export function useWebSocket(onUnauthorized?: () => void): UseWebSocketResult {
     setError(null);
   }, []);
 
-  return { step, result, error, isRunning, submitQuery, loadCachedResult, cancel };
+  return { step, result, error, isRunning, earlyPapers, submitQuery, loadCachedResult, cancel };
 }

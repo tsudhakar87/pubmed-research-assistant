@@ -156,6 +156,7 @@ export type PipelineStep =
   | 'scoring_relevance'
   | 'extracting_evidence'
   | 'synthesizing'
+  | 'papers_ready'
   | 'done'
   | 'error'
   | 'scoring_variant';

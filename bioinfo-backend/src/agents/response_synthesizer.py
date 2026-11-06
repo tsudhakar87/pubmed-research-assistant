@@ -34,7 +34,7 @@ _DESIGN_NAMES = {
 _STYLE_RULES = """Write plain text only: no markdown, no headings, no bullet points.
 Cite papers with their numbers in square brackets right after each claim, e.g. [3] or [2, 7].
 Only cite numbers that appear in the list. Do not invent studies, numbers or findings.
-Keep it to about 200 words."""
+Keep it to about 350–400 words."""
 
 
 def sanitize_citations(text: str, valid_refs: Iterable[int]) -> str:
@@ -162,7 +162,7 @@ class ResponseSynthesizer:
         else:
             prompt = fallback_prompt(original_query, papers)
 
-        text = await self.gemini.generate_text(prompt, temperature=0.3, max_tokens=2048)
+        text = await self.gemini.generate_text(prompt, temperature=0.3, max_tokens=4096)
         if not text:
             return FAILED
         return sanitize_citations(text, _refs(papers))
