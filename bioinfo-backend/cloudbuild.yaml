@@ -36,7 +36,7 @@ steps:
           gcloud run jobs update db-migrate \
             --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID \
             --region=${_REGION} \
-            --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
+            --set-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
             --set-secrets=DATABASE_URL=database-url:latest \
             --command=alembic \
             --args=upgrade,head \
@@ -47,7 +47,7 @@ steps:
           gcloud run jobs create db-migrate \
             --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID \
             --region=${_REGION} \
-            --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
+            --set-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
             --set-secrets=DATABASE_URL=database-url:latest \
             --command=alembic \
             --args=upgrade,head \
