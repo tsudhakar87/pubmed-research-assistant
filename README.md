@@ -1,6 +1,6 @@
 # PubMed Research Assistant
 
-A bioinformatics research platform for searching PubMed, bioRxiv, and medRxiv literature, ranking results by semantic relevance, and synthesizing findings with Gemini AI. Built with FastAPI + React, deployed on Google Cloud Run.
+A research platform for searching PubMed, bioRxiv, and medRxiv literature, ranking results by semantic relevance, and synthesizing findings with Gemini AI. Built with FastAPI + React, deployed on Google Cloud Run.
 
 **Live demo:** [pubmed-assistant.web.app](https://pubmed-assistant.web.app)
 
