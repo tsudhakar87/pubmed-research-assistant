@@ -171,7 +171,7 @@ async def test_process_query_merges_scores_and_emits_events():
 
     assert events == [
         "classifying", "searching_pubmed", "searching_preprints",
-        "retrieving_abstracts", "scoring_relevance",
+        "retrieving_abstracts", "scoring_relevance", "papers_ready",
     ]
     # The medRxiv record duplicates the PubMed title and is dropped
     assert [p.title for p in response.literature_results] == ["Bio preprint", "PubMed paper"]
