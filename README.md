@@ -1,6 +1,6 @@
 # PubMed Research Assistant
 
-A research platform for searching PubMed, bioRxiv, and medRxiv literature, ranking results by semantic relevance, and synthesizing findings with Gemini AI. Built with FastAPI + React, deployed on Google Cloud Run.
+A research platform for searching PubMed, bioRxiv, and medRxiv literature, ranking results by semantic relevance, and synthesizing findings with Gemini AI. The backend is built with FastAPI, the frontend with React, and the project is deployed on Google Cloud Run.
 
 **Live demo:** [pubmed-assistant.web.app](https://pubmed-assistant.web.app)
 
@@ -115,7 +115,7 @@ NCBI_EMAIL=you@example.com
 NCBI_API_KEY=your_ncbi_key          # optional but raises rate limit to 10 rps
 
 # Google Cloud
-GOOGLE_CLOUD_PROJECT=mcp-project-476900
+GOOGLE_CLOUD_PROJECT=<gcp-project-id>
 VERTEX_AI_LOCATION=us-central1
 VERTEX_AI_MODEL=gemini-3.8-flash
 VERTEX_AI_EMBEDDING_MODEL=text-embedding-004
@@ -127,7 +127,7 @@ JWT_SECRET=change_me_in_prod        # openssl rand -hex 32
 # Database (local)
 DATABASE_URL=postgresql+asyncpg://YOUR_MACOS_USER@localhost:5432/bioinfo_db
 
-# BigQuery (optional — analytics, fails silently if unset)
+# BigQuery (optional for analytics, fails silently if unset)
 BIGQUERY_DATASET=pubmed_analytics
 BIGQUERY_TABLE=query_events
 ```
@@ -196,7 +196,7 @@ echo -n "$JWT_SECRET" | gcloud secrets create jwt-secret --data-file=-
 
 ```bash
 cd bioinfo-backend
-export PROJECT_ID=mcp-project-476900
+export PROJECT_ID=<gcp-project-id>
 ./deploy.sh
 ```
 
