@@ -87,10 +87,6 @@ classifying → searching_pubmed → searching_preprints → retrieving_abstract
   → scoring_relevance → papers_ready → extracting_evidence → synthesizing → done | error
 ```
 
-`papers_ready` fires before Gemini runs — the frontend renders ranked papers immediately while evidence extraction and synthesis continue in the background.
-
-Authenticate by sending `{"token": "<jwt>", "query": "..."}` as the first message.
-
 **Pipeline details:**
 - `searching_pubmed` and `searching_preprints` (bioRxiv + medRxiv) run in parallel
 - Deduplication is DOI-first
@@ -232,8 +228,6 @@ GitHub Actions runs on every push/PR to `main`:
 **`ModuleNotFoundError: asyncpg`** — `pip install asyncpg --force-reinstall`
 
 **WebSocket auth fails** — Send JWT in the first message body, not as a header (browsers don't support custom WS headers).
-
-**Variant gene not detected** — Gene must appear within ~60 characters before the variant notation (e.g., `BRAF V600E`).
 
 ## Resources
 
