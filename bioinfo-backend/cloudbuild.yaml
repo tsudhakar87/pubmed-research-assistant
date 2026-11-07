@@ -79,7 +79,7 @@ steps:
       - '--concurrency=80'
       - '--add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}'
       - '--set-env-vars=^;^ENVIRONMENT=production;PROJECT_ID=${PROJECT_ID};GOOGLE_CLOUD_PROJECT=${PROJECT_ID};REGION=${_REGION};VERTEX_AI_LOCATION=${_REGION};VERTEX_AI_MODEL=gemini-3.8-flash;VERTEX_AI_EMBEDDING_MODEL=text-embedding-004;BIGQUERY_DATASET=bioinfo_analytics;GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID};CORS_ORIGINS=${_CORS_ORIGINS}'
-      - '--set-secrets=DATABASE_URL=database-url:latest,JWT_SECRET=jwt-secret:latest,NVIDIA_API_KEY=nvidia-api-key:latest,NCBI_EMAIL=ncbi-email:latest,NCBI_API_KEY=ncbi-api-key:latest'
+      - '--set-secrets=DATABASE_URL=database-url:latest,JWT_SECRET=jwt-secret:latest,NVIDIA_API_KEY=nvidia-api-key:latest,NCBI_EMAIL=ncbi-email:latest,NCBI_API_KEY=ncbi-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest'
     id: 'deploy-cloud-run'
 
 # Substitution variables (can be overridden with --substitutions)

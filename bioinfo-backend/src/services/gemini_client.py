@@ -1,13 +1,16 @@
 """
-Async Gemini client on the google-genai SDK (Vertex AI backend).
+Async Gemini client on the google-genai SDK.
 
-Replaces vertexai.generative_models for new code: that module is deprecated, and
-VertexAIClient calls its synchronous generate_content() from async code, which
-blocks the event loop for the whole generation. This client uses client.aio.
+Supports two backends:
+- API key (GEMINI_API_KEY set): uses the Gemini AI Studio endpoint directly.
+  Required for models on the Gemini Enterprise Agent Platform (e.g. gemini-3.8-flash)
+  that are not available through the Vertex AI publisher endpoint.
+- Vertex AI (fallback): uses project + location credentials via ADC.
 
 Every method returns None on failure so callers can degrade gracefully.
 """
 import logging
+import os
 from typing import Optional, Type, TypeVar
 
 from pydantic import BaseModel
@@ -26,22 +29,27 @@ class GeminiClient:
         project_id: Optional[str] = None,
         location: Optional[str] = None,
         model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         self.project_id = project_id or vertex_ai_config.project_id or settings.project_id
         self.location = location or vertex_ai_config.location
         self.model_name = model_name or vertex_ai_config.model_name
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
         self._failed = False
 
     @property
     def available(self) -> bool:
-        return bool(self.project_id) and not self._failed
+        return (bool(self.api_key) or bool(self.project_id)) and not self._failed
 
     def _get_client(self):
         if self._client is None:
             try:
                 from google import genai
-                self._client = genai.Client(vertexai=True, project=self.project_id, location=self.location)
+                if self.api_key:
+                    self._client = genai.Client(api_key=self.api_key)
+                else:
+                    self._client = genai.Client(vertexai=True, project=self.project_id, location=self.location)
             except Exception as exc:
                 self._failed = True
                 logger.warning("Gemini client unavailable: %s", exc)
