@@ -123,7 +123,7 @@ export function AISynthesis({ summary, loading, sourcesCount, onRegenerate, onCi
           )}
         </div>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#9aa1ab' }}>
-          {loading ? 'gemini-3.8-flash · generating…' : `gemini-3.8-flash · ${sourcesCount ?? 0} sources`}
+          {loading ? 'gemini-2.5-flash · generating…' : `gemini-2.5-flash · ${sourcesCount ?? 0} sources`}
         </span>
       </div>
 
